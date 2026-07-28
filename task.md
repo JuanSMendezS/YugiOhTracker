@@ -1,0 +1,30 @@
+# Lista de Tareas: YugiHub
+
+- `[x]` Fase 1: Inicialización del Backend
+  - `[x]` Crear el proyecto Laravel 11 en `/backend`
+  - `[x]` Instalar soporte de API (Sanctum) con `php artisan install:api`
+  - `[x]` Configurar base de datos en `.env` (usando SQLite por defecto para desarrollo ágil y autocontenido)
+- `[x]` Fase 2: Modelos y Migraciones (Basado en UUID)
+  - `[x]` Migración de Perfiles (Duelista / Tienda)
+  - `[x]` Migración de Catálogo (Carta, Impresión, Set, Rareza)
+  - `[x]` Migración de Marketplace (Activo Comercial, Publicación, Imagen)
+  - `[x]` Migración de Pedidos y Pagos
+  - `[x]` Migración de Colección y Decks
+- `[x]` Fase 3: Comando de Sincronización de Catálogo
+  - `[x]` Diseñar el cliente HTTP para YGOPRODeck API
+  - `[x]` Crear comando `php artisan app:sync-catalog`
+  - `[x]` Implementar carga masiva por lotes (chunking) de cartas, sets e impresiones
+- `[x]` Fase 4: Endpoints de Autenticación y Catálogo
+  - `[x]` Autenticación (Registro, Login, Logout)
+  - `[x]` Búsqueda y filtrado de cartas y sets
+- `[ ]` Fase 5: Endpoints de Marketplace e Inventario
+  - `[ ]` Crear / Editar / Listar / Eliminar Publicaciones
+  - `[ ]` Ver Inventario de Tienda
+- `[ ]` Fase 6: Colección, Deck Builder y Pedidos
+  - `[ ]` Endpoints para gestionar la Colección y Wishlist
+  - `[ ]` Creación y versionado de Decks con cálculo de costos
+  - `[ ]` Compra básica de cartas (reservar e historial)
+- `[ ]` Fase 7: Frontend de React
+  - `[ ]` Configuración de cliente Axios y Proxy de Vite
+  - `[ ]` Páginas de Catálogo, Perfil, Marketplace e Inventario
+  - `[ ]` Páginas de Colección y Deck Builder
