@@ -24,7 +24,7 @@
   - `[x]` Endpoints para gestionar la Colección y Wishlist
   - `[x]` Creación y versionado de Decks con cálculo de costos
   - `[x]` Compra básica de cartas (reservar e historial)
-- `[ ]` Fase 7: Frontend de React
-  - `[ ]` Configuración de cliente Axios y Proxy de Vite
-  - `[ ]` Páginas de Catálogo, Perfil, Marketplace e Inventario
-  - `[ ]` Páginas de Colección y Deck Builder
+- `[x]` Fase 7: Frontend de React
+  - `[x]` Configuración de cliente Axios y Proxy de Vite
+  - `[x]` Páginas de Catálogo, Perfil, Marketplace e Inventario
+  - `[x]` Páginas de Colección y Deck Builder
