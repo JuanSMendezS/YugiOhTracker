@@ -17,9 +17,9 @@
 - `[x]` Fase 4: Endpoints de Autenticación y Catálogo
   - `[x]` Autenticación (Registro, Login, Logout)
   - `[x]` Búsqueda y filtrado de cartas y sets
-- `[ ]` Fase 5: Endpoints de Marketplace e Inventario
-  - `[ ]` Crear / Editar / Listar / Eliminar Publicaciones
-  - `[ ]` Ver Inventario de Tienda
+- `[x]` Fase 5: Endpoints de Marketplace e Inventario
+  - `[x]` Crear / Editar / Listar / Eliminar Publicaciones
+  - `[x]` Ver Inventario de Tienda
 - `[ ]` Fase 6: Colección, Deck Builder y Pedidos
   - `[ ]` Endpoints para gestionar la Colección y Wishlist
   - `[ ]` Creación y versionado de Decks con cálculo de costos
