@@ -17,14 +17,14 @@
 - `[x]` Fase 4: Endpoints de Autenticación y Catálogo
   - `[x]` Autenticación (Registro, Login, Logout)
   - `[x]` Búsqueda y filtrado de cartas y sets
-- `[ ]` Fase 5: Endpoints de Marketplace e Inventario
-  - `[ ]` Crear / Editar / Listar / Eliminar Publicaciones
-  - `[ ]` Ver Inventario de Tienda
-- `[ ]` Fase 6: Colección, Deck Builder y Pedidos
-  - `[ ]` Endpoints para gestionar la Colección y Wishlist
-  - `[ ]` Creación y versionado de Decks con cálculo de costos
-  - `[ ]` Compra básica de cartas (reservar e historial)
-- `[ ]` Fase 7: Frontend de React
-  - `[ ]` Configuración de cliente Axios y Proxy de Vite
-  - `[ ]` Páginas de Catálogo, Perfil, Marketplace e Inventario
-  - `[ ]` Páginas de Colección y Deck Builder
+- `[x]` Fase 5: Endpoints de Marketplace e Inventario
+  - `[x]` Crear / Editar / Listar / Eliminar Publicaciones
+  - `[x]` Ver Inventario de Tienda
+- `[x]` Fase 6: Colección, Deck Builder y Pedidos
+  - `[x]` Endpoints para gestionar la Colección y Wishlist
+  - `[x]` Creación y versionado de Decks con cálculo de costos
+  - `[x]` Compra básica de cartas (reservar e historial)
+- `[x]` Fase 7: Frontend de React
+  - `[x]` Configuración de cliente Axios y Proxy de Vite
+  - `[x]` Páginas de Catálogo, Perfil, Marketplace e Inventario
+  - `[x]` Páginas de Colección y Deck Builder
