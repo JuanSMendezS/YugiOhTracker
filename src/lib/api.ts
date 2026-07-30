@@ -4,10 +4,19 @@ export const AUTH_TOKEN_KEY = 'yugihub_token'
 
 export const api = axios.create({
   baseURL: '/api',
+  withCredentials: true,
   headers: {
     Accept: 'application/json',
   },
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
 })
+
+export async function ensureCsrfCookie() {
+  await fetch('/sanctum/csrf-cookie', {
+    credentials: 'include',
+  })
+}
 
 export function setAuthToken(token: string | null) {
   if (token) {

@@ -5,6 +5,7 @@ export type ApiCard = {
   name: string
   type?: string | null
   frameType?: string | null
+  prints_count?: number
   desc?: string | null
   atk?: number | null
   def?: number | null
@@ -40,18 +41,42 @@ export type ApiSet = {
 export type ApiListing = {
   id: string
   title?: string | null
+  description?: string | null
   asset_type: string
   price: string | number
   currency: string
   quantity: number
   status: string
+  condition?: string | null
+  language?: string | null
   card_print_id?: string | null
+  user?: {
+    id?: string
+    name?: string | null
+    profile?: ApiProfile | null
+  }
   cardPrint?: {
+    id?: string
     print_code?: string | null
     card?: {
+      id?: string
+      name?: string | null
+      type?: string | null
+      attribute?: string | null
+      race?: string | null
+      archetype?: string | null
+    }
+    set?: {
+      id?: string
+      code?: string | null
       name?: string | null
     }
+    rarity?: string | null
+    price_cardmarket?: string | number | null
+    image_url?: string | null
   }
+  items?: Array<{ id?: string; quantity?: number; card_print_id?: string | null; cardPrint?: { print_code?: string | null; rarity?: string | null } }>
+  images?: Array<{ id?: string; image_path?: string | null }>
 }
 
 export type ApiProfile = {
@@ -110,10 +135,17 @@ export type ApiUser = {
   id: string
   name: string
   email: string
+  profile?: ApiProfile | null
 }
 
 export type Paginated<T> = {
   data: T[]
+  current_page?: number
+  last_page?: number
+  per_page?: number
+  total?: number
+  from?: number | null
+  to?: number | null
 }
 
 export type DeckDraftCard = {
@@ -135,6 +167,15 @@ export type DeckDetail = {
   versions: Array<{
     id: string
     version_name: string
+    cards?: Array<{
+      id: string
+      card_id: string
+      card_name?: string | null
+      quantity: number
+      section: 'main' | 'extra' | 'side'
+      estimated_unit_price?: number
+      estimated_line_total?: number
+    }>
     summary: {
       total_cards: number
       estimated_total_cost: number

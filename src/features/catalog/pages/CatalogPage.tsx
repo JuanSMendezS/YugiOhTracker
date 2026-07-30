@@ -165,7 +165,7 @@ function CatalogPage() {
       sx={{
         display: 'grid',
         gap: 2,
-        gridTemplateColumns: { xs: '1fr', lg: '270px minmax(0,1fr) 320px' },
+        gridTemplateColumns: { xs: '1fr', lg: '260px minmax(0,1.9fr) 260px' },
         alignItems: 'start',
       }}
     >
@@ -256,7 +256,7 @@ function CatalogPage() {
                 sx={{
                   display: 'grid',
                   gap: 1.2,
-                  gridTemplateColumns: viewMode === 'grid' ? { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' } : '1fr',
+                  gridTemplateColumns: viewMode === 'grid' ? { xs: '1fr', md: '1fr', xl: 'repeat(2, minmax(0, 1fr))' } : '1fr',
                 }}
               >
                 {Array.from({ length: 8 }).map((_, index) => (
@@ -331,16 +331,28 @@ function CatalogPage() {
                     onClick={() => setPreviewCard(card)}
                   >
                     <CardContent sx={{ py: '12px !important' }}>
-                      <Box sx={{ display: 'flex', gap: 1.2, alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 700 }} noWrap>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          gap: 1,
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          alignItems: { xs: 'stretch', sm: 'center' },
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
                             {card.name}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary" noWrap>
+                          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.35 }}>
                             {card.type ?? 'Sin tipo'} | {card.race ?? 'Sin raza'}
                           </Typography>
                         </Box>
-                        <Button size="small" onClick={() => openDetail(card.id)}>
+                        <Button
+                          size="small"
+                          onClick={() => openDetail(card.id)}
+                          sx={{ width: { xs: '100%', sm: 'auto' }, flexShrink: 0 }}
+                        >
                           Abrir
                         </Button>
                       </Box>
@@ -377,7 +389,7 @@ function CatalogPage() {
                 component="img"
                 src={previewCard.card_images?.[0]?.image_url}
                 alt={previewCard.name}
-                sx={{ width: '100%', borderRadius: 1.5, border: '1px solid', borderColor: 'divider' }}
+                    sx={{ width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 1.5, border: '1px solid', borderColor: 'divider' }}
               />
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 {previewCard.name}

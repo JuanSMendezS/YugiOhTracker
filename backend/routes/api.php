@@ -59,5 +59,5 @@ Route::middleware('auth:sanctum')->group(function (): void {
 });
 
 Route::get('/user', function (Request $request) {
-    return $request->user();
+    return $request->user()?->load('profile');
 })->middleware('auth:sanctum');

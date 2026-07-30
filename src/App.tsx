@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api, restoreAuthToken, setAuthToken } from './lib/api'
+import { api, ensureCsrfCookie } from './lib/api'
 import AppShell from './components/AppShell'
 import CatalogSection from './components/sections/CatalogSection'
 import CollectionSection from './components/sections/CollectionSection'
@@ -204,14 +204,16 @@ function App() {
   }, [cards, selectedCardSet])
 
   useEffect(() => {
-    const restored = restoreAuthToken()
-    setToken(restored)
-    void refreshPublicData()
-    if (restored) {
-      void loadMe()
-      void loadPrivateData()
-    }
+    void loadSessionAndPublicData()
   }, [])
+
+  async function loadSessionAndPublicData() {
+    void refreshPublicData()
+    const isLoggedIn = await loadMe()
+    if (isLoggedIn) {
+      await loadPrivateData()
+    }
+  }
 
   async function loadCardsFromYgoDeck(options?: {
     query?: string
@@ -324,11 +326,14 @@ function App() {
     try {
       const response = await api.get<ApiUser>('/user')
       setUser(response.data)
+      setProfile(response.data.profile ?? null)
+      setToken('session')
+      return true
     } catch {
-      setAuthToken(null)
       setToken(null)
       setUser(null)
       setProfile(null)
+      return false
     }
   }
 
@@ -359,8 +364,8 @@ function App() {
 
   async function handleRegister() {
     try {
+      await ensureCsrfCookie()
       const response = await api.post<{
-        token: string
         user: ApiUser
         profile: ApiProfile
       }>('/auth/register', {
@@ -370,10 +375,9 @@ function App() {
         password_confirmation: registerPassword,
         profile_type: registerType,
       })
-      setAuthToken(response.data.token)
-      setToken(response.data.token)
       setUser(response.data.user)
       setProfile(response.data.profile)
+      setToken('session')
       setStatusText('Registro exitoso')
       await loadPrivateData()
     } catch (error) {
@@ -383,18 +387,17 @@ function App() {
 
   async function handleLogin() {
     try {
+      await ensureCsrfCookie()
       const response = await api.post<{
-        token: string
         user: ApiUser
         profile: ApiProfile
       }>('/auth/login', {
         email: loginEmail,
         password: loginPassword,
       })
-      setAuthToken(response.data.token)
-      setToken(response.data.token)
       setUser(response.data.user)
       setProfile(response.data.profile)
+      setToken('session')
       setStatusText('Login exitoso')
       await loadPrivateData()
     } catch (error) {
@@ -404,11 +407,11 @@ function App() {
 
   async function handleLogout() {
     try {
+      await ensureCsrfCookie()
       await api.post('/auth/logout')
     } catch {
       // ignore logout errors and clear local state anyway
     }
-    setAuthToken(null)
     setToken(null)
     setUser(null)
     setProfile(null)

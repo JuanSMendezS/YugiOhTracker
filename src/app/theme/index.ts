@@ -31,6 +31,27 @@ export const appTheme = createTheme({
   },
   typography: {
     fontFamily: 'Space Grotesk, Segoe UI, sans-serif',
+    fontSize: 14.5,
+    body1: {
+      fontSize: '0.96rem',
+      lineHeight: 1.55,
+    },
+    body2: {
+      fontSize: '0.86rem',
+      lineHeight: 1.45,
+    },
+    h4: {
+      fontWeight: 800,
+      fontSize: '2rem',
+    },
+    h5: {
+      fontWeight: 700,
+      fontSize: '1.4rem',
+    },
+    h6: {
+      fontWeight: 700,
+      fontSize: '1.05rem',
+    },
     button: {
       textTransform: 'none',
       fontWeight: 600,
@@ -52,6 +73,16 @@ export const appTheme = createTheme({
           borderRadius: radiusTokens.card,
           boxShadow: 'none',
           backgroundColor: colorTokens.surface1,
+        },
+      },
+    },
+    MuiCardContent: {
+      styleOverrides: {
+        root: {
+          padding: 14,
+          '&:last-child': {
+            paddingBottom: 14,
+          },
         },
       },
     },

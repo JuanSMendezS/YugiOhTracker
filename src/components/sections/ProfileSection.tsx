@@ -83,7 +83,7 @@ function ProfileSection({
             Sesión actual
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Token: {token ? 'activo' : 'sin token'}
+            Sesión: {token ? 'activa' : 'sin sesión'}
           </Alert>
           <Typography variant="body1">Usuario: {user?.name ?? 'No autenticado'}</Typography>
           <Typography variant="body1">Perfil: {profile?.type ?? 'N/A'}</Typography>

@@ -79,25 +79,37 @@ function CardDetailPage() {
           <Skeleton variant="rounded" height={240} />
         </Stack>
       ) : card ? (
-        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '320px minmax(0,1fr) 320px' } }}>
-          <Card>
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: 'minmax(0,0.9fr) minmax(0,1.2fr)', xl: '340px minmax(0,1.15fr) 300px' } }}>
+          <Card sx={{ minWidth: 0 }}>
             <CardContent>
               <Box
                 component="img"
                 src={card.card_images?.[0]?.image_url}
                 alt={card.name}
-                sx={{ width: '100%', borderRadius: 1.5, border: '1px solid', borderColor: 'divider' }}
+                sx={{
+                  width: '100%',
+                  maxWidth: { xs: 260, sm: 320, lg: '100%' },
+                  maxHeight: { xs: 360, sm: 420, lg: 'none' },
+                  objectFit: 'contain',
+                  display: 'block',
+                  mx: 'auto',
+                  borderRadius: 1.5,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
               />
             </CardContent>
           </Card>
 
-          <Card>
+          <Card sx={{ minWidth: 0 }}>
             <CardContent>
-              <Stack spacing={1.2}>
-                <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
+              <Stack spacing={1.1}>
+                <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.08, fontSize: { xs: '1.7rem', sm: '2rem' } }}>
                   {card.name}
                 </Typography>
-                <Typography color="text.secondary">{card.type ?? 'Sin tipo'} {card.race ? `| ${card.race}` : ''}</Typography>
+                <Typography color="text.secondary" sx={{ fontSize: { xs: '0.92rem', sm: '1rem' } }}>
+                  {card.type ?? 'Sin tipo'} {card.race ? `| ${card.race}` : ''}
+                </Typography>
 
                 <Stack direction="row" spacing={0.8} useFlexGap sx={{ flexWrap: 'wrap' }}>
                   {card.attribute ? <Chip label={`Atributo: ${card.attribute}`} size="small" /> : null}
@@ -106,7 +118,7 @@ function CardDetailPage() {
                   {typeof card.def === 'number' ? <Chip label={`DEF ${card.def}`} size="small" /> : null}
                 </Stack>
 
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', fontSize: { xs: '0.92rem', sm: '0.98rem' } }}>
                   {card.desc ?? 'Sin descripcion disponible'}
                 </Typography>
 
@@ -116,29 +128,31 @@ function CardDetailPage() {
                   Prints y sets
                 </Typography>
 
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Set</TableCell>
-                      <TableCell>Codigo</TableCell>
-                      <TableCell>Rareza</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {(card.card_sets ?? []).slice(0, 12).map((entry, index) => (
-                      <TableRow key={`${entry.set_name}-${entry.set_code}-${index}`}>
-                        <TableCell>{entry.set_name}</TableCell>
-                        <TableCell>{entry.set_code}</TableCell>
-                        <TableCell>{entry.set_rarity ?? '-'}</TableCell>
+                <Box sx={{ overflowX: 'auto' }}>
+                  <Table size="small" sx={{ minWidth: 420 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Set</TableCell>
+                        <TableCell>Codigo</TableCell>
+                        <TableCell>Rareza</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHead>
+                    <TableBody>
+                      {(card.card_sets ?? []).slice(0, 12).map((entry, index) => (
+                        <TableRow key={`${entry.set_name}-${entry.set_code}-${index}`}>
+                          <TableCell>{entry.set_name}</TableCell>
+                          <TableCell>{entry.set_code}</TableCell>
+                          <TableCell>{entry.set_rarity ?? '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
               </Stack>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card sx={{ minWidth: 0 }}>
             <CardContent>
               <Stack spacing={1.2}>
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>

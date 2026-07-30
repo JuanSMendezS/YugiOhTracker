@@ -5,8 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Profile;
 use App\Models\User;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -34,12 +35,11 @@ class AuthController extends Controller
             'display_name' => $validated['display_name'] ?? $validated['name'],
         ]);
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        Auth::login($user);
+        $request->session()->regenerate();
 
         return response()->json([
             'message' => 'Registro exitoso',
-            'token' => $token,
-            'token_type' => 'Bearer',
             'user' => $user,
             'profile' => $profile,
         ], 201);
@@ -50,6 +50,7 @@ class AuthController extends Controller
         $validated = $request->validate([
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
+            'remember' => ['sometimes', 'boolean'],
         ]);
 
         $user = User::where('email', $validated['email'])->first();
@@ -60,12 +61,11 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        Auth::login($user, (bool) ($validated['remember'] ?? false));
+        $request->session()->regenerate();
 
         return response()->json([
             'message' => 'Login exitoso',
-            'token' => $token,
-            'token_type' => 'Bearer',
             'user' => $user,
             'profile' => $user->profile,
         ]);
@@ -73,11 +73,9 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $token = $request->user()?->currentAccessToken();
-
-        if ($token) {
-            $token->delete();
-        }
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return response()->json([
             'message' => 'Logout exitoso',

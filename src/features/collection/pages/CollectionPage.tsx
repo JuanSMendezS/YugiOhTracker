@@ -30,7 +30,6 @@ import {
   createCollectionItem,
   createWishlistItem,
   deleteCollectionItem,
-  ensureAuthToken,
   fetchCollectionData,
   type CollectionSummary,
   updateCollectionItem,
@@ -62,13 +61,6 @@ function CollectionPage() {
   const [wishlistPriority, setWishlistPriority] = useState<'alta' | 'media' | 'baja'>('media')
 
   async function loadData() {
-    const token = ensureAuthToken()
-    if (!token) {
-      setErrorText('Inicia sesion para gestionar tu coleccion en esta vista.')
-      setIsLoading(false)
-      return
-    }
-
     setIsLoading(true)
     setErrorText(null)
     try {
@@ -79,7 +71,19 @@ function CollectionPage() {
       setSelectableCards(payload.selectableCards)
       setAvailablePrints(payload.availablePrints)
     } catch (error: unknown) {
-      setErrorText(error instanceof Error ? error.message : 'No se pudieron cargar los datos de coleccion')
+      const isUnauthorized =
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as { response?: { status?: number } }).response?.status === 'number' &&
+        (error as { response?: { status?: number } }).response?.status === 401
+
+      const message = isUnauthorized
+        ? 'Inicia sesion para ver y gestionar tu coleccion.'
+        : error instanceof Error
+          ? error.message
+          : 'No se pudieron cargar los datos de coleccion'
+      setErrorText(message)
     } finally {
       setIsLoading(false)
     }

@@ -33,18 +33,18 @@ function AppShell({
   ]
 
   return (
-    <Box component="main" sx={{ display: 'grid', gap: 2.5, width: 'min(1180px, 100% - 24px)', mx: 'auto', my: 2.5 }}>
+    <Box component="main" sx={{ display: 'grid', gap: 2.25, width: 'min(1320px, 100% - 20px)', mx: 'auto', my: 2.25 }}>
       <Box
         sx={{
-          p: { xs: 2, md: 2.4 },
+          p: { xs: 1.75, md: 2.1 },
           borderRadius: 3,
           backgroundColor: '#f5f7fb',
           border: '1px solid #dbe2ea',
         }}
       >
-        <AppBar position="sticky" color="transparent" elevation={0} sx={{ mb: 2.5, borderRadius: 2, backgroundColor: '#1f2937', boxShadow: 'none' }}>
-          <Toolbar disableGutters sx={{ justifyContent: 'center', px: { xs: 1, md: 1.5 }, py: 0.4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', gap: { xs: 1, md: 3.5 }, flexWrap: 'wrap', alignItems: 'center' }}>
+        <AppBar position="sticky" color="transparent" elevation={0} sx={{ mb: 2, borderRadius: 2, backgroundColor: '#1f2937', boxShadow: 'none' }}>
+          <Toolbar disableGutters sx={{ justifyContent: 'center', px: { xs: 0.75, md: 1.25 }, py: 0.35 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', gap: { xs: 0.75, md: 2.5 }, flexWrap: 'wrap', alignItems: 'center' }}>
               {tabs.map((tab) => {
                 const isActive = activeTab === tab.value
                 return (
@@ -53,8 +53,8 @@ function AppShell({
                     color="inherit"
                     onClick={() => onTabChange(tab.value)}
                     sx={{
-                      px: 1.25,
-                      py: 0.6,
+                      px: 1.1,
+                      py: 0.5,
                       minWidth: 'auto',
                       fontWeight: 600,
                       textTransform: 'none',
@@ -75,8 +75,8 @@ function AppShell({
                 color="inherit"
                 onClick={() => onTabChange('perfil')}
                 sx={{
-                  px: 1.25,
-                  py: 0.6,
+                  px: 1.1,
+                  py: 0.5,
                   minWidth: 'auto',
                   fontWeight: 600,
                   textTransform: 'none',
@@ -95,15 +95,19 @@ function AppShell({
           </Toolbar>
         </AppBar>
 
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.75, alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between' }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.24em', display: 'block', mb: 0.5 }}>
               YugiHub Tracker
             </Typography>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 800, mb: 0.75, lineHeight: 1.1 }}>
+            <Typography
+              variant="h4"
+              component="h1"
+              sx={{ fontWeight: 800, mb: 0.75, lineHeight: 1.08, fontSize: { xs: '1.75rem', sm: '1.95rem', md: '2.15rem' } }}
+            >
               {title}
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '70ch' }}>
+            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '64ch', fontSize: { xs: '0.94rem', md: '0.98rem' } }}>
               {subtitle}
             </Typography>
             {statusText ? (
@@ -114,7 +118,7 @@ function AppShell({
           </Box>
 
           {heroMetrics.length > 0 ? (
-            <Box sx={{ display: 'grid', gap: 0.8, minWidth: { xs: '100%', md: 240 } }}>
+            <Box sx={{ display: 'grid', gap: 0.65, minWidth: { xs: '100%', md: 240 } }}>
               {heroMetrics.slice(0, 3).map((metric) => (
                 <Typography key={metric.label} variant="caption" color="text.secondary">
                   {metric.icon} {metric.label}: {metric.value}

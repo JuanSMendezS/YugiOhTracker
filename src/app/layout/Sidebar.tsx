@@ -9,24 +9,44 @@ import ViewModuleRoundedIcon from '@mui/icons-material/ViewModuleRounded'
 import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Typography } from '@mui/material'
 import { NavLink } from 'react-router-dom'
 
-const navItems = [
+type NavItem = {
+  to: string
+  label: string
+  icon: JSX.Element
+  requiresAuth?: boolean
+  requiresStore?: boolean
+}
+
+const navItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: <DashboardRoundedIcon fontSize="small" /> },
   { to: '/catalog', label: 'Catalogo', icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { to: '/marketplace', label: 'Marketplace', icon: <StorefrontRoundedIcon fontSize="small" /> },
-  { to: '/collection', label: 'Coleccion', icon: <Inventory2RoundedIcon fontSize="small" /> },
-  { to: '/deck-builder', label: 'Deck Builder', icon: <StyleRoundedIcon fontSize="small" /> },
+  { to: '/collection', label: 'Coleccion', icon: <Inventory2RoundedIcon fontSize="small" />, requiresAuth: true },
+  { to: '/deck-builder', label: 'Deck Builder', icon: <StyleRoundedIcon fontSize="small" />, requiresAuth: true },
   { to: '/prices', label: 'Precios', icon: <AutoGraphRoundedIcon fontSize="small" /> },
   { to: '/profile', label: 'Perfil', icon: <PersonRoundedIcon fontSize="small" /> },
-  { to: '/store/tu-tienda', label: 'Tienda', icon: <SchoolRoundedIcon fontSize="small" /> },
+  { to: '/store/tu-tienda', label: 'Tienda', icon: <SchoolRoundedIcon fontSize="small" />, requiresAuth: true, requiresStore: true },
 ]
 
 type SidebarProps = {
   onNavigate?: () => void
+  isAuthenticated?: boolean
+  isStore?: boolean
 }
 
-function Sidebar({ onNavigate }: SidebarProps) {
+function Sidebar({ onNavigate, isAuthenticated = false, isStore = false }: SidebarProps) {
+  const visibleItems = navItems.filter((item) => {
+    if (item.requiresAuth && !isAuthenticated) {
+      return false
+    }
+    if (item.requiresStore && !isStore) {
+      return false
+    }
+    return true
+  })
+
   return (
-    <Box sx={{ width: 264, p: 1.5 }}>
+    <Box sx={{ width: 252, p: 1.25 }}>
       <Typography variant="overline" sx={{ letterSpacing: '0.16em', color: 'text.secondary', px: 1.2 }}>
         YUGIHUB TRACKER
       </Typography>
@@ -37,7 +57,7 @@ function Sidebar({ onNavigate }: SidebarProps) {
       <Divider sx={{ mb: 1.2 }} />
 
       <List disablePadding>
-        {navItems.map((item) => (
+        {visibleItems.map((item) => (
           <ListItemButton
             key={item.to}
             component={NavLink}

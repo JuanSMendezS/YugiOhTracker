@@ -1,4 +1,4 @@
-import { api, restoreAuthToken } from '../../../lib/api'
+import { api } from '../../../lib/api'
 import type { ApiCard, ApiCollectionItem, ApiListing, ApiWishlistItem, Paginated } from '../../../types/app'
 
 export type CollectionSummary = {
@@ -18,10 +18,6 @@ type CollectionResponse = {
 type WishlistResponse = {
   id: string
   items: ApiWishlistItem[]
-}
-
-export function ensureAuthToken() {
-  return restoreAuthToken()
 }
 
 export async function fetchCollectionData() {
