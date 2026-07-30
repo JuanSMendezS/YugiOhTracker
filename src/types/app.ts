@@ -60,6 +60,52 @@ export type ApiProfile = {
   display_name: string
 }
 
+export type ApiCollectionItem = {
+  id: string
+  quantity: number
+  condition?: string | null
+  language?: string | null
+  is_foil?: boolean
+  notes?: string | null
+  card_print_id: string
+  cardPrint?: {
+    id?: string
+    rarity?: string | null
+    print_code?: string | null
+    price_cardmarket?: string | number | null
+    image_url?: string | null
+    card?: {
+      id?: string
+      name?: string | null
+      type?: string | null
+      attribute?: string | null
+      race?: string | null
+      archetype?: string | null
+    }
+    set?: {
+      id?: string
+      code?: string | null
+      name?: string | null
+    }
+  }
+}
+
+export type ApiWishlistItem = {
+  id: string
+  card_id: string
+  priority: 'alta' | 'media' | 'baja'
+  target_price?: string | number | null
+  notes?: string | null
+  card?: {
+    id?: string
+    name?: string | null
+    type?: string | null
+    attribute?: string | null
+    race?: string | null
+    archetype?: string | null
+  }
+}
+
 export type ApiUser = {
   id: string
   name: string

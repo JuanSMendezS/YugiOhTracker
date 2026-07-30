@@ -7,6 +7,7 @@ type AppShellProps = {
   onTabChange: (tab: TabKey) => void
   title: string
   subtitle: string
+  statusText?: string
   heroMetrics: Array<{ icon: string; label: string; value: number | string }>
   user: ApiUser | null
   profile: ApiProfile | null
@@ -18,6 +19,7 @@ function AppShell({
   onTabChange,
   title,
   subtitle,
+  statusText,
   heroMetrics,
   user,
   profile,
@@ -104,7 +106,22 @@ function AppShell({
             <Typography variant="body1" color="text.secondary" sx={{ maxWidth: '70ch' }}>
               {subtitle}
             </Typography>
+            {statusText ? (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.1 }}>
+                {statusText}
+              </Typography>
+            ) : null}
           </Box>
+
+          {heroMetrics.length > 0 ? (
+            <Box sx={{ display: 'grid', gap: 0.8, minWidth: { xs: '100%', md: 240 } }}>
+              {heroMetrics.slice(0, 3).map((metric) => (
+                <Typography key={metric.label} variant="caption" color="text.secondary">
+                  {metric.icon} {metric.label}: {metric.value}
+                </Typography>
+              ))}
+            </Box>
+          ) : null}
         </Box>
 
       </Box>
