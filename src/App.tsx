@@ -1,81 +1,59 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, restoreAuthToken, setAuthToken } from './lib/api'
+import AppShell from './components/AppShell'
+import CatalogSection from './components/sections/CatalogSection'
+import CollectionSection from './components/sections/CollectionSection'
+import DecksSection from './components/sections/DecksSection'
+import MarketplaceSection from './components/sections/MarketplaceSection'
+import ProfileSection from './components/sections/ProfileSection'
 import './App.css'
+import type {
+  ApiCard,
+  ApiListing,
+  ApiProfile,
+  ApiSet,
+  ApiUser,
+  DeckDetail,
+  DeckDraftCard,
+  DeckSummary,
+  Paginated,
+  TabKey,
+} from './types/app'
 
-type TabKey = 'catalogo' | 'perfil' | 'marketplace' | 'coleccion' | 'decks'
-
-type ApiCard = {
-  id: string
+type YgoCardResponse = {
+  id: number
   name: string
-  type?: string | null
-  attribute?: string | null
-  race?: string | null
-  archetype?: string | null
-}
-
-type ApiSet = {
-  id: string
-  code: string
-  name: string
-}
-
-type ApiListing = {
-  id: string
-  title?: string | null
-  asset_type: string
-  price: string | number
-  currency: string
-  quantity: number
-  status: string
-  card_print_id?: string | null
-  cardPrint?: {
-    print_code?: string | null
-    card?: {
-      name?: string | null
-    }
-  }
-}
-
-type ApiProfile = {
-  id: string
-  type: 'duelista' | 'tienda'
-  display_name: string
-}
-
-type ApiUser = {
-  id: string
-  name: string
-  email: string
-}
-
-type Paginated<T> = {
-  data: T[]
-}
-
-type DeckDraftCard = {
-  card_id: string
-  quantity: number
-  section: 'main' | 'extra' | 'side'
-}
-
-type DeckSummary = {
-  id: string
-  name: string
-  description?: string | null
-}
-
-type DeckDetail = {
-  id: string
-  name: string
-  description?: string | null
-  versions: Array<{
-    id: string
-    version_name: string
-    summary: {
-      total_cards: number
-      estimated_total_cost: number
-    }
+  type?: string
+  frameType?: string
+  desc?: string
+  atk?: number
+  def?: number
+  level?: number
+  attribute?: string
+  race?: string
+  archetype?: string
+  card_sets?: Array<{
+    set_name: string
+    set_code: string
+    set_rarity?: string
+    set_price?: string
   }>
+  card_images?: Array<{
+    id: number
+    image_url?: string
+    image_url_small?: string
+    image_url_cropped?: string
+  }>
+  card_prices?: Array<{
+    cardmarket_price?: string
+    ebay_price?: string
+    amazon_price?: string
+    coolstuffinc_price?: string
+  }>
+}
+
+type YgoSetResponse = {
+  set_name: string
 }
 
 function getErrorMessage(error: unknown): string {
@@ -91,13 +69,15 @@ function getErrorMessage(error: unknown): string {
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('catalogo')
-  const [statusText, setStatusText] = useState('Listo para conectar con la API')
+  const [statusText, setStatusText] = useState('Plataforma lista para operar')
 
   const [token, setToken] = useState<string | null>(null)
   const [user, setUser] = useState<ApiUser | null>(null)
   const [profile, setProfile] = useState<ApiProfile | null>(null)
 
   const [cards, setCards] = useState<ApiCard[]>([])
+  const [allYgoSetNames, setAllYgoSetNames] = useState<string[]>([])
+  const [internalCards, setInternalCards] = useState<ApiCard[]>([])
   const [sets, setSets] = useState<ApiSet[]>([])
   const [listings, setListings] = useState<ApiListing[]>([])
   const [inventory, setInventory] = useState<ApiListing[]>([])
@@ -117,6 +97,10 @@ function App() {
 
   const [cardQuery, setCardQuery] = useState('')
   const [setQuery, setSetQuery] = useState('')
+  const [selectedCardSet, setSelectedCardSet] = useState('')
+  const [cardPage, setCardPage] = useState(1)
+  const [cardPageSize, setCardPageSize] = useState(24)
+  const [hasNextCardPage, setHasNextCardPage] = useState(false)
 
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
@@ -162,6 +146,62 @@ function App() {
   }, [listings])
 
   const isStore = profile?.type === 'tienda'
+  const isAuthenticated = Boolean(token)
+  const canCreateDeck = isAuthenticated
+  const canCreateListing = isAuthenticated && isStore
+  const canManageCollection = isAuthenticated
+  const selectableCards = internalCards.length > 0 ? internalCards : cards
+  const isDuelist = profile?.type === 'duelista'
+
+  const heroMetrics = useMemo(() => {
+    const metrics = [
+      { icon: '🛒', label: 'Publicaciones activas', value: listings.length },
+      { icon: '🗂️', label: 'Sets disponibles', value: allYgoSetNames.length },
+    ]
+    if (isDuelist) {
+      metrics.push({ icon: '🧩', label: 'Decks cargados', value: decks.length })
+    }
+    return metrics
+  }, [allYgoSetNames.length, decks.length, isDuelist, listings.length])
+
+  const cardSetFilters = useMemo(() => {
+    const bySet = new Map<string, { name: string; count: number }>()
+
+    for (const setName of allYgoSetNames) {
+      const normalizedName = setName.trim().toLowerCase()
+      if (!normalizedName) {
+        continue
+      }
+      if (!bySet.has(normalizedName)) {
+        bySet.set(normalizedName, { name: setName.trim(), count: 0 })
+      }
+    }
+
+    for (const card of cards) {
+      for (const setEntry of card.card_sets ?? []) {
+        const normalizedName = setEntry.set_name.trim().toLowerCase()
+        if (!normalizedName) {
+          continue
+        }
+        const current = bySet.get(normalizedName)
+        if (current) {
+          current.count += 1
+          continue
+        }
+        bySet.set(normalizedName, { name: setEntry.set_name.trim(), count: 1 })
+      }
+    }
+    return [...bySet.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [allYgoSetNames, cards])
+
+  const visibleCards = useMemo(() => {
+    if (!selectedCardSet) {
+      return cards
+    }
+    return cards.filter((card) =>
+      (card.card_sets ?? []).some((setEntry) => setEntry.set_name === selectedCardSet),
+    )
+  }, [cards, selectedCardSet])
 
   useEffect(() => {
     const restored = restoreAuthToken()
@@ -173,18 +213,110 @@ function App() {
     }
   }, [])
 
+  async function loadCardsFromYgoDeck(options?: {
+    query?: string
+    cardSetName?: string
+    page?: number
+    pageSize?: number
+  }) {
+    const params = new URLSearchParams()
+    const page = options?.page ?? 1
+    const pageSize = options?.pageSize ?? cardPageSize
+    const offset = (page - 1) * pageSize
+
+    if (options?.query && !params.has('name') && !params.has('fname')) {
+      params.set('fname', options.query)
+    }
+
+    if (options?.cardSetName) {
+      params.set('cardset', options.cardSetName)
+    }
+
+    params.set('num', String(pageSize))
+    params.set('offset', String(offset))
+
+    const response = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?${params.toString()}`)
+    if (!response.ok) {
+      throw new Error(`YGOPRODeck respondio ${response.status}`)
+    }
+
+    const payload = (await response.json()) as { data?: YgoCardResponse[]; error?: string }
+    if (payload.error) {
+      throw new Error(payload.error)
+    }
+
+    const nextCards = (payload.data ?? []).map((card) => ({
+      id: String(card.id),
+      name: card.name,
+      type: card.type ?? null,
+      frameType: card.frameType ?? null,
+      desc: card.desc ?? null,
+      atk: card.atk ?? null,
+      def: card.def ?? null,
+      level: card.level ?? null,
+      attribute: card.attribute ?? null,
+      race: card.race ?? null,
+      archetype: card.archetype ?? null,
+      card_sets: card.card_sets,
+      card_images: card.card_images,
+      card_prices: card.card_prices,
+    }))
+
+    setCards(nextCards)
+    setHasNextCardPage(nextCards.length === pageSize)
+    return nextCards.length
+  }
+
+  async function loadAllYgoSets() {
+    const response = await fetch('https://db.ygoprodeck.com/api/v7/cardsets.php')
+    if (!response.ok) {
+      throw new Error(`YGOPRODeck sets respondio ${response.status}`)
+    }
+
+    const payload = (await response.json()) as YgoSetResponse[]
+    const uniqueNames = Array.from(new Set(payload.map((setEntry) => setEntry.set_name.trim())))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b))
+
+    setAllYgoSetNames(uniqueNames)
+  }
+
   async function refreshPublicData() {
+    const failures: string[] = []
+
     try {
-      const [cardsRes, setsRes, listingsRes] = await Promise.all([
-        api.get<Paginated<ApiCard>>('/cards', { params: { per_page: 12 } }),
+      await loadCardsFromYgoDeck({ page: 1, pageSize: cardPageSize })
+      setCardPage(1)
+    } catch (error) {
+      failures.push(`cartas externas: ${getErrorMessage(error)}`)
+    }
+
+    try {
+      await loadAllYgoSets()
+    } catch (error) {
+      failures.push(`sets externos: ${getErrorMessage(error)}`)
+    }
+
+    try {
+      const internalCardsRes = await api.get<Paginated<ApiCard>>('/cards', { params: { per_page: 50 } })
+      setInternalCards(internalCardsRes.data.data)
+    } catch {
+      setInternalCards([])
+    }
+
+    try {
+      const [setsRes, listingsRes] = await Promise.all([
         api.get<Paginated<ApiSet>>('/sets', { params: { per_page: 12 } }),
         api.get<Paginated<ApiListing>>('/listings', { params: { per_page: 12 } }),
       ])
-      setCards(cardsRes.data.data)
       setSets(setsRes.data.data)
       setListings(listingsRes.data.data)
     } catch (error) {
-      setStatusText(`No se pudo cargar datos publicos: ${getErrorMessage(error)}`)
+      failures.push(`datos del backend: ${getErrorMessage(error)}`)
+    }
+
+    if (failures.length > 0) {
+      setStatusText(`Carga parcial: ${failures.join(' | ')}`)
     }
   }
 
@@ -290,15 +422,52 @@ function App() {
 
   async function searchCatalog() {
     try {
-      const [cardsRes, setsRes] = await Promise.all([
-        api.get<Paginated<ApiCard>>('/cards', { params: { q: cardQuery, per_page: 20 } }),
+      const targetPage = 1
+      const [_, setsRes] = await Promise.all([
+        loadCardsFromYgoDeck({
+          query: cardQuery,
+          cardSetName: selectedCardSet || undefined,
+          page: targetPage,
+          pageSize: cardPageSize,
+        }),
         api.get<Paginated<ApiSet>>('/sets', { params: { q: setQuery, per_page: 20 } }),
       ])
-      setCards(cardsRes.data.data)
+      setCardPage(targetPage)
       setSets(setsRes.data.data)
-      setStatusText('Catalogo actualizado')
     } catch (error) {
       setStatusText(`Error al buscar en catalogo: ${getErrorMessage(error)}`)
+    }
+  }
+
+  async function handleSelectCardSet(setName: string) {
+    setSelectedCardSet(setName)
+    try {
+      await loadCardsFromYgoDeck({
+        query: cardQuery,
+        cardSetName: setName || undefined,
+        page: 1,
+        pageSize: cardPageSize,
+      })
+      setCardPage(1)
+    } catch (error) {
+      setStatusText(`No se pudo filtrar por set: ${getErrorMessage(error)}`)
+    }
+  }
+
+  async function goToCardPage(nextPage: number) {
+    if (nextPage < 1) {
+      return
+    }
+    try {
+      await loadCardsFromYgoDeck({
+        query: cardQuery,
+        cardSetName: selectedCardSet || undefined,
+        page: nextPage,
+        pageSize: cardPageSize,
+      })
+      setCardPage(nextPage)
+    } catch (error) {
+      setStatusText(`No se pudo cambiar de pagina: ${getErrorMessage(error)}`)
     }
   }
 
@@ -319,7 +488,7 @@ function App() {
   }
 
   async function createListing() {
-    if (!isStore) {
+    if (!canCreateListing) {
       setStatusText('Solo los perfiles tienda pueden crear publicaciones')
       return
     }
@@ -342,6 +511,10 @@ function App() {
   }
 
   async function addCollectionItem() {
+    if (!canManageCollection) {
+      setStatusText('Inicia sesion para gestionar coleccion')
+      return
+    }
     try {
       await api.post('/collection/items', {
         card_print_id: collectionPrintId,
@@ -358,6 +531,10 @@ function App() {
   }
 
   async function addWishlistItem() {
+    if (!canManageCollection) {
+      setStatusText('Inicia sesion para gestionar wishlist')
+      return
+    }
     try {
       await api.post('/wishlist/items', {
         card_id: wishlistCardId,
@@ -374,6 +551,10 @@ function App() {
   }
 
   function addDraftCard() {
+    if (!canCreateDeck) {
+      setStatusText('Inicia sesion para preparar un deck')
+      return
+    }
     if (!draftCardId) {
       return
     }
@@ -390,6 +571,10 @@ function App() {
   }
 
   async function createDeck() {
+    if (!canCreateDeck) {
+      setStatusText('Inicia sesion para crear decks')
+      return
+    }
     try {
       const response = await api.post<DeckDetail>('/decks', {
         name: deckName,
@@ -418,6 +603,10 @@ function App() {
   }
 
   async function createVersion() {
+    if (!canCreateDeck) {
+      setStatusText('Inicia sesion para crear versiones de deck')
+      return
+    }
     if (!selectedDeck) {
       return
     }
@@ -454,434 +643,144 @@ function App() {
     }
   }
 
+  const handlePageSizeChange = (nextSize: number) => {
+    setCardPageSize(nextSize)
+    void loadCardsFromYgoDeck({
+      query: cardQuery,
+      cardSetName: selectedCardSet || undefined,
+      page: 1,
+      pageSize: nextSize,
+    })
+    setCardPage(1)
+  }
+
   return (
-    <main className="app-shell">
-      <header className="hero-strip">
-        <p className="eyebrow">YugiHub Tracker</p>
-        <h1>Frontend operativo para Fase 7</h1>
-        <p className="subtitle">
-          Catalogo, perfil, marketplace, inventario, coleccion, wishlist y deck builder en una sola
-          consola de trabajo.
-        </p>
-        <div className="status-pill">{statusText}</div>
-      </header>
-
-      <nav className="tab-grid" aria-label="Navegacion principal">
-        {([
-          ['catalogo', 'Catalogo'],
-          ['perfil', 'Perfil'],
-          ['marketplace', 'Marketplace'],
-          ['coleccion', 'Coleccion'],
-          ['decks', 'Deck Builder'],
-        ] as Array<[TabKey, string]>).map(([key, label]) => (
-          <button
-            type="button"
-            key={key}
-            className={activeTab === key ? 'tab active' : 'tab'}
-            onClick={() => setActiveTab(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-
+    <AppShell
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      title="Centro operativo de cartas, tiendas y decks"
+      subtitle="Todo en un solo lugar: catálogo, perfiles, marketplace, inventario, colección, wishlist, deck builder y compras."
+      statusText={statusText}
+      heroMetrics={heroMetrics}
+      user={user}
+      profile={profile}
+    >
       {activeTab === 'catalogo' && (
-        <section className="panel">
-          <h2>Catalogo</h2>
-          <div className="controls">
-            <input
-              value={cardQuery}
-              onChange={(event) => setCardQuery(event.target.value)}
-              placeholder="Buscar cartas..."
-            />
-            <input
-              value={setQuery}
-              onChange={(event) => setSetQuery(event.target.value)}
-              placeholder="Buscar sets..."
-            />
-            <button type="button" onClick={() => void searchCatalog()}>
-              Buscar
-            </button>
-            <button type="button" onClick={() => void refreshPublicData()}>
-              Recargar
-            </button>
-          </div>
-          <div className="two-columns">
-            <article className="card-list">
-              <h3>Cartas ({cards.length})</h3>
-              {cards.map((card) => (
-                <div className="row" key={card.id}>
-                  <strong>{card.name}</strong>
-                  <span>{card.type ?? 'Sin tipo'}</span>
-                  <small>{card.archetype ?? card.race ?? 'General'}</small>
-                </div>
-              ))}
-            </article>
-            <article className="card-list">
-              <h3>Sets ({sets.length})</h3>
-              {sets.map((set) => (
-                <div className="row" key={set.id}>
-                  <strong>{set.code}</strong>
-                  <span>{set.name}</span>
-                </div>
-              ))}
-            </article>
-          </div>
-        </section>
+        <CatalogSection
+          cards={cards}
+          visibleCards={visibleCards}
+          sets={sets}
+          cardSetFilters={cardSetFilters}
+          cardQuery={cardQuery}
+          setQuery={setQuery}
+          selectedCardSet={selectedCardSet}
+          cardPage={cardPage}
+          cardPageSize={cardPageSize}
+          hasNextCardPage={hasNextCardPage}
+          onCardQueryChange={setCardQuery}
+          onSetQueryChange={setSetQuery}
+          onSelectCardSet={(value) => void handleSelectCardSet(value)}
+          onSearch={() => void searchCatalog()}
+          onPageSizeChange={handlePageSizeChange}
+          onPrevPage={() => void goToCardPage(cardPage - 1)}
+          onNextPage={() => void goToCardPage(cardPage + 1)}
+        />
       )}
 
       {activeTab === 'perfil' && (
-        <section className="panel">
-          <h2>Perfil y sesion</h2>
-          <div className="two-columns">
-            <article className="stack">
-              <h3>Login</h3>
-              <input
-                value={loginEmail}
-                onChange={(event) => setLoginEmail(event.target.value)}
-                placeholder="Email"
-              />
-              <input
-                type="password"
-                value={loginPassword}
-                onChange={(event) => setLoginPassword(event.target.value)}
-                placeholder="Password"
-              />
-              <button type="button" onClick={() => void handleLogin()}>
-                Iniciar sesion
-              </button>
-            </article>
-
-            <article className="stack">
-              <h3>Registro</h3>
-              <input
-                value={registerName}
-                onChange={(event) => setRegisterName(event.target.value)}
-                placeholder="Nombre"
-              />
-              <input
-                value={registerEmail}
-                onChange={(event) => setRegisterEmail(event.target.value)}
-                placeholder="Email"
-              />
-              <input
-                type="password"
-                value={registerPassword}
-                onChange={(event) => setRegisterPassword(event.target.value)}
-                placeholder="Password (min 8)"
-              />
-              <select
-                value={registerType}
-                onChange={(event) => setRegisterType(event.target.value as 'duelista' | 'tienda')}
-              >
-                <option value="duelista">duelista</option>
-                <option value="tienda">tienda</option>
-              </select>
-              <button type="button" onClick={() => void handleRegister()}>
-                Crear cuenta
-              </button>
-            </article>
-          </div>
-
-          <article className="identity-box">
-            <h3>Sesion actual</h3>
-            <p>
-              Token: <strong>{token ? 'activo' : 'sin token'}</strong>
-            </p>
-            <p>
-              Usuario: <strong>{user?.name ?? 'No autenticado'}</strong>
-            </p>
-            <p>
-              Perfil: <strong>{profile?.type ?? 'N/A'}</strong>
-            </p>
-            <button type="button" onClick={() => void handleLogout()}>
-              Cerrar sesion
-            </button>
-          </article>
-        </section>
+        <ProfileSection
+          loginEmail={loginEmail}
+          loginPassword={loginPassword}
+          registerName={registerName}
+          registerEmail={registerEmail}
+          registerPassword={registerPassword}
+          registerType={registerType}
+          token={token}
+          user={user}
+          profile={profile}
+          onLoginEmailChange={setLoginEmail}
+          onLoginPasswordChange={setLoginPassword}
+          onRegisterNameChange={setRegisterName}
+          onRegisterEmailChange={setRegisterEmail}
+          onRegisterPasswordChange={setRegisterPassword}
+          onRegisterTypeChange={setRegisterType}
+          onLogin={() => void handleLogin()}
+          onRegister={() => void handleRegister()}
+          onLogout={() => void handleLogout()}
+        />
       )}
 
       {activeTab === 'marketplace' && (
-        <section className="panel">
-          <h2>Marketplace e inventario</h2>
-          <div className="controls">
-            <button type="button" onClick={() => void refreshMarketplace()}>
-              Refrescar publicaciones
-            </button>
-            <button type="button" onClick={() => void simulateBuyFirstListing()}>
-              Compra rapida (1 item)
-            </button>
-          </div>
-
-          <div className="two-columns">
-            <article className="card-list">
-              <h3>Publicaciones publicas ({listings.length})</h3>
-              {listings.map((listing) => (
-                <div className="row" key={listing.id}>
-                  <strong>{listing.title ?? listing.cardPrint?.card?.name ?? 'Publicacion'}</strong>
-                  <span>
-                    {listing.price} {listing.currency} - qty {listing.quantity}
-                  </span>
-                  <small>
-                    {listing.status} / {listing.asset_type}
-                  </small>
-                </div>
-              ))}
-            </article>
-
-            <article className="card-list">
-              <h3>Inventario de tienda ({inventory.length})</h3>
-              {inventory.map((listing) => (
-                <div className="row" key={listing.id}>
-                  <strong>{listing.title ?? listing.cardPrint?.card?.name ?? 'Publicacion'}</strong>
-                  <span>
-                    {listing.price} {listing.currency}
-                  </span>
-                  <small>{listing.status}</small>
-                </div>
-              ))}
-            </article>
-          </div>
-
-          <article className="stack">
-            <h3>Crear publicacion (solo tienda)</h3>
-            <input
-              value={listingTitle}
-              onChange={(event) => setListingTitle(event.target.value)}
-              placeholder="Titulo"
-            />
-            <select
-              value={listingAssetType}
-              onChange={(event) => setListingAssetType(event.target.value)}
-            >
-              <option value="carta_individual">carta_individual</option>
-              <option value="playset">playset</option>
-              <option value="base">base</option>
-              <option value="producto_sellado">producto_sellado</option>
-            </select>
-            <input
-              value={listingPrice}
-              onChange={(event) => setListingPrice(event.target.value)}
-              placeholder="Precio"
-            />
-            <input
-              value={listingQuantity}
-              onChange={(event) => setListingQuantity(event.target.value)}
-              placeholder="Cantidad"
-            />
-            <select
-              value={listingPrintId}
-              onChange={(event) => setListingPrintId(event.target.value)}
-            >
-              <option value="">Sin card_print_id</option>
-              {availablePrints.map((item) => (
-                <option key={item.printId} value={item.printId}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-            <button type="button" onClick={() => void createListing()}>
-              Publicar
-            </button>
-          </article>
-        </section>
+        <MarketplaceSection
+          listings={listings}
+          inventory={inventory}
+          isStore={isStore}
+          canCreateListing={canCreateListing}
+          listingTitle={listingTitle}
+          listingAssetType={listingAssetType}
+          listingPrice={listingPrice}
+          listingQuantity={listingQuantity}
+          listingPrintId={listingPrintId}
+          availablePrints={availablePrints}
+          onRefresh={() => void refreshMarketplace()}
+          onBuy={() => void simulateBuyFirstListing()}
+          onListingTitleChange={setListingTitle}
+          onListingAssetTypeChange={setListingAssetType}
+          onListingPriceChange={setListingPrice}
+          onListingQuantityChange={setListingQuantity}
+          onListingPrintIdChange={setListingPrintId}
+          onCreateListing={() => void createListing()}
+        />
       )}
 
       {activeTab === 'coleccion' && (
-        <section className="panel">
-          <h2>Coleccion y wishlist</h2>
-          <div className="summary-grid">
-            <div>
-              <span>Total cartas</span>
-              <strong>{collectionSummary?.total_cards ?? 0}</strong>
-            </div>
-            <div>
-              <span>Items distintos</span>
-              <strong>{collectionSummary?.distinct_items ?? 0}</strong>
-            </div>
-            <div>
-              <span>Valor estimado</span>
-              <strong>{collectionSummary?.estimated_value ?? 0}</strong>
-            </div>
-          </div>
-
-          <div className="two-columns">
-            <article className="stack">
-              <h3>Agregar a coleccion</h3>
-              <select
-                value={collectionPrintId}
-                onChange={(event) => setCollectionPrintId(event.target.value)}
-              >
-                <option value="">Selecciona un print</option>
-                {availablePrints.map((item) => (
-                  <option key={item.printId} value={item.printId}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={collectionQty}
-                onChange={(event) => setCollectionQty(event.target.value)}
-                placeholder="Cantidad"
-              />
-              <button type="button" onClick={() => void addCollectionItem()}>
-                Agregar
-              </button>
-            </article>
-
-            <article className="stack">
-              <h3>Agregar a wishlist</h3>
-              <select
-                value={wishlistCardId}
-                onChange={(event) => setWishlistCardId(event.target.value)}
-              >
-                <option value="">Selecciona una carta</option>
-                {cards.map((card) => (
-                  <option key={card.id} value={card.id}>
-                    {card.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={wishlistPriority}
-                onChange={(event) => setWishlistPriority(event.target.value)}
-              >
-                <option value="alta">alta</option>
-                <option value="media">media</option>
-                <option value="baja">baja</option>
-              </select>
-              <button type="button" onClick={() => void addWishlistItem()}>
-                Agregar
-              </button>
-              <div className="compact-list">
-                {wishlistItems.map((item) => (
-                  <p key={item.id}>
-                    {item.card.name} - <strong>{item.priority}</strong>
-                  </p>
-                ))}
-              </div>
-            </article>
-          </div>
-        </section>
+        <CollectionSection
+          collectionSummary={collectionSummary}
+          availablePrints={availablePrints}
+          selectableCards={selectableCards}
+          wishlistItems={wishlistItems}
+          canManageCollection={canManageCollection}
+          collectionPrintId={collectionPrintId}
+          collectionQty={collectionQty}
+          wishlistCardId={wishlistCardId}
+          wishlistPriority={wishlistPriority}
+          onCollectionPrintIdChange={setCollectionPrintId}
+          onCollectionQtyChange={setCollectionQty}
+          onWishlistCardIdChange={setWishlistCardId}
+          onWishlistPriorityChange={setWishlistPriority}
+          onAddCollection={() => void addCollectionItem()}
+          onAddWishlist={() => void addWishlistItem()}
+        />
       )}
 
       {activeTab === 'decks' && (
-        <section className="panel">
-          <h2>Deck builder y versiones</h2>
-          <div className="two-columns">
-            <article className="stack">
-              <h3>Crear deck</h3>
-              <input
-                value={deckName}
-                onChange={(event) => setDeckName(event.target.value)}
-                placeholder="Nombre del deck"
-              />
-              <input
-                value={deckDescription}
-                onChange={(event) => setDeckDescription(event.target.value)}
-                placeholder="Descripcion"
-              />
-
-              <h4>Cartas para la version</h4>
-              <select
-                value={draftCardId}
-                onChange={(event) => setDraftCardId(event.target.value)}
-              >
-                <option value="">Selecciona carta</option>
-                {cards.map((card) => (
-                  <option key={card.id} value={card.id}>
-                    {card.name}
-                  </option>
-                ))}
-              </select>
-              <div className="controls inline">
-                <input
-                  value={draftCardQty}
-                  onChange={(event) => setDraftCardQty(event.target.value)}
-                  placeholder="Qty"
-                />
-                <select
-                  value={draftCardSection}
-                  onChange={(event) =>
-                    setDraftCardSection(event.target.value as 'main' | 'extra' | 'side')
-                  }
-                >
-                  <option value="main">main</option>
-                  <option value="extra">extra</option>
-                  <option value="side">side</option>
-                </select>
-                <button type="button" onClick={addDraftCard}>
-                  Agregar carta
-                </button>
-              </div>
-
-              <div className="compact-list">
-                {draftCards.map((card, index) => (
-                  <p key={`${card.card_id}-${index}`}>
-                    {card.card_id.slice(0, 8)}... x{card.quantity} [{card.section}]
-                  </p>
-                ))}
-              </div>
-
-              <button type="button" onClick={() => void createDeck()}>
-                Crear deck
-              </button>
-            </article>
-
-            <article className="stack">
-              <h3>Mis decks</h3>
-              <div className="compact-list">
-                {decks.map((deck) => (
-                  <button
-                    className="link-like"
-                    type="button"
-                    key={deck.id}
-                    onClick={() => void loadDeck(deck.id)}
-                  >
-                    {deck.name}
-                  </button>
-                ))}
-              </div>
-
-              {selectedDeck && (
-                <>
-                  <h4>{selectedDeck.name}</h4>
-                  <p>{selectedDeck.description ?? 'Sin descripcion'}</p>
-                  <div className="compact-list">
-                    {selectedDeck.versions.map((version) => (
-                      <p key={version.id}>
-                        {version.version_name}: {version.summary.total_cards} cartas, costo estimado{' '}
-                        {version.summary.estimated_total_cost}
-                      </p>
-                    ))}
-                  </div>
-
-                  <input
-                    value={versionName}
-                    onChange={(event) => setVersionName(event.target.value)}
-                    placeholder="Nombre de nueva version"
-                  />
-                  <select
-                    value={copyFromVersionId}
-                    onChange={(event) => setCopyFromVersionId(event.target.value)}
-                  >
-                    <option value="">No copiar version</option>
-                    {selectedDeck.versions.map((version) => (
-                      <option key={version.id} value={version.id}>
-                        Copiar {version.version_name}
-                      </option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => void createVersion()}>
-                    Crear version
-                  </button>
-                </>
-              )}
-            </article>
-          </div>
-        </section>
+        <DecksSection
+          canCreateDeck={canCreateDeck}
+          selectableCards={selectableCards}
+          decks={decks}
+          selectedDeck={selectedDeck}
+          deckName={deckName}
+          deckDescription={deckDescription}
+          draftCardId={draftCardId}
+          draftCardQty={draftCardQty}
+          draftCardSection={draftCardSection}
+          draftCards={draftCards}
+          versionName={versionName}
+          copyFromVersionId={copyFromVersionId}
+          onDeckNameChange={setDeckName}
+          onDeckDescriptionChange={setDeckDescription}
+          onDraftCardIdChange={setDraftCardId}
+          onDraftCardQtyChange={setDraftCardQty}
+          onDraftCardSectionChange={setDraftCardSection}
+          onAddDraftCard={addDraftCard}
+          onCreateDeck={() => void createDeck()}
+          onLoadDeck={(deckId) => void loadDeck(deckId)}
+          onVersionNameChange={setVersionName}
+          onCopyFromVersionIdChange={setCopyFromVersionId}
+          onCreateVersion={() => void createVersion()}
+        />
       )}
-    </main>
+    </AppShell>
   )
 }
 

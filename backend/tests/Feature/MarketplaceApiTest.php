@@ -189,4 +189,113 @@ class MarketplaceApiTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.title', 'Inventario propio');
     }
+
+    public function test_base_pricing_endpoint_returns_cardmarket_price_when_available(): void
+    {
+        $set = Set::create([
+            'code' => 'SDK',
+            'name' => 'Starter Deck Kaiba',
+        ]);
+
+        $card = Card::create([
+            'name' => 'Blue-Eyes White Dragon',
+        ]);
+
+        $print = CardPrint::create([
+            'card_id' => $card->id,
+            'set_id' => $set->id,
+            'rarity' => 'Ultra Rare',
+            'print_code' => 'SDK-001',
+            'price_cardmarket' => 3.75,
+        ]);
+
+        $this->getJson('/api/pricing/base?card_print_id='.$print->id)
+            ->assertOk()
+            ->assertJsonPath('source', 'price_cardmarket')
+            ->assertJsonPath('base_price', 3.75);
+    }
+
+    public function test_store_listing_uses_base_price_when_price_is_not_provided(): void
+    {
+        $storeUser = User::factory()->create();
+        Profile::create([
+            'user_id' => $storeUser->id,
+            'type' => 'tienda',
+            'display_name' => 'Kaiba Corp Cards',
+        ]);
+
+        $set = Set::create([
+            'code' => 'SDK',
+            'name' => 'Starter Deck Kaiba',
+        ]);
+
+        $card = Card::create([
+            'name' => 'Blue-Eyes White Dragon',
+        ]);
+
+        $print = CardPrint::create([
+            'card_id' => $card->id,
+            'set_id' => $set->id,
+            'rarity' => 'Ultra Rare',
+            'print_code' => 'SDK-001',
+            'price_cardmarket' => 4.10,
+        ]);
+
+        Sanctum::actingAs($storeUser);
+
+        $created = $this->postJson('/api/listings', [
+            'card_print_id' => $print->id,
+            'asset_type' => 'carta_individual',
+            'title' => 'Blue-Eyes precio base',
+            'quantity' => 1,
+        ]);
+
+        $created
+            ->assertCreated()
+            ->assertJsonPath('price', 4.10)
+            ->assertJsonPath('title', 'Blue-Eyes precio base');
+    }
+
+    public function test_store_listing_keeps_own_price_and_saves_base_reference(): void
+    {
+        $storeUser = User::factory()->create();
+        Profile::create([
+            'user_id' => $storeUser->id,
+            'type' => 'tienda',
+            'display_name' => 'Kaiba Corp Cards',
+        ]);
+
+        $set = Set::create([
+            'code' => 'SDK',
+            'name' => 'Starter Deck Kaiba',
+        ]);
+
+        $card = Card::create([
+            'name' => 'Blue-Eyes White Dragon',
+        ]);
+
+        $print = CardPrint::create([
+            'card_id' => $card->id,
+            'set_id' => $set->id,
+            'rarity' => 'Ultra Rare',
+            'print_code' => 'SDK-001',
+            'price_cardmarket' => 3.75,
+        ]);
+
+        Sanctum::actingAs($storeUser);
+
+        $created = $this->postJson('/api/listings', [
+            'card_print_id' => $print->id,
+            'asset_type' => 'carta_individual',
+            'title' => 'Blue-Eyes precio propio',
+            'price' => 8.90,
+            'quantity' => 1,
+        ]);
+
+        $created
+            ->assertCreated()
+            ->assertJsonPath('price', 8.90)
+            ->assertJsonPath('base_reference_price', 3.75)
+            ->assertJsonPath('base_reference_source', 'price_cardmarket');
+    }
 }

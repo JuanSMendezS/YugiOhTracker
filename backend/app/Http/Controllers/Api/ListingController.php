@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CardPrint;
 use App\Models\Listing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ class ListingController extends Controller
             ->with([
                 'user:id,name',
                 'user.profile:id,user_id,type,display_name',
-                'cardPrint:id,card_id,set_id,rarity,print_code,price_tcgplayer,price_cardmarket,image_url',
+                'cardPrint:id,card_id,set_id,rarity,print_code,price_cardmarket,image_url',
                 'cardPrint.card:id,name,type,attribute,race,archetype',
                 'cardPrint.set:id,code,name',
                 'items:id,listing_id,card_print_id,quantity',
@@ -107,7 +108,7 @@ class ListingController extends Controller
             'asset_type' => ['required', 'string', 'in:carta_individual,playset,base,producto_sellado'],
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'price' => ['required', 'numeric', 'min:0'],
+            'price' => ['nullable', 'numeric', 'min:0', 'required_without:card_print_id'],
             'currency' => ['nullable', 'string', 'size:3'],
             'quantity' => ['nullable', 'integer', 'min:1'],
             'status' => ['nullable', 'string', 'in:disponible,reservado,vendido,pausado'],
@@ -120,15 +121,22 @@ class ListingController extends Controller
             'images.*' => ['required', 'string', 'max:2048'],
         ]);
 
-        $listing = DB::transaction(function () use ($validated, $user): Listing {
+        $reference = $this->resolveBaseReference($validated['card_print_id'] ?? null);
+        $resolvedPrice = $this->resolveListingPrice($validated, $reference['price']);
+
+        $listing = DB::transaction(function () use ($validated, $user, $resolvedPrice, $reference): Listing {
             $listing = Listing::create([
                 'user_id' => $user->id,
                 'card_print_id' => $validated['card_print_id'] ?? null,
                 'asset_type' => $validated['asset_type'],
                 'title' => $validated['title'] ?? null,
                 'description' => $validated['description'] ?? null,
-                'price' => $validated['price'],
+                'price' => $resolvedPrice,
                 'currency' => strtoupper($validated['currency'] ?? 'COP'),
+                'base_reference_price' => $reference['price'],
+                'base_reference_source' => $reference['source'],
+                'base_reference_currency' => $reference['currency'],
+                'base_reference_updated_at' => $reference['updated_at'],
                 'quantity' => $validated['quantity'] ?? 1,
                 'status' => $validated['status'] ?? 'disponible',
                 'condition' => $validated['condition'] ?? null,
@@ -150,6 +158,55 @@ class ListingController extends Controller
         return response()->json($this->loadListing($listing), 201);
     }
 
+    /**
+     * @param array<string, mixed> $validated
+     */
+    private function resolveListingPrice(array $validated, ?float $referencePrice): float
+    {
+        if (isset($validated['price'])) {
+            return (float) $validated['price'];
+        }
+
+        if (is_null($referencePrice)) {
+            abort(422, 'Debes enviar un precio o una impresión con precio base disponible.');
+        }
+
+        return $referencePrice;
+    }
+
+    /**
+     * @return array{price: float|null, source: string|null, currency: string|null, updated_at: \Illuminate\Support\Carbon|null}
+     */
+    private function resolveBaseReference(?string $cardPrintId): array
+    {
+        if (! is_string($cardPrintId) || $cardPrintId === '') {
+            return [
+                'price' => null,
+                'source' => null,
+                'currency' => null,
+                'updated_at' => null,
+            ];
+        }
+
+        $print = CardPrint::query()->find($cardPrintId);
+
+        if (! is_null($print?->price_cardmarket)) {
+            return [
+                'price' => (float) $print->price_cardmarket,
+                'source' => 'price_cardmarket',
+                'currency' => 'EUR',
+                'updated_at' => null,
+            ];
+        }
+
+        return [
+            'price' => null,
+            'source' => null,
+            'currency' => null,
+            'updated_at' => null,
+        ];
+    }
+
     public function show(Listing $listing): JsonResponse
     {
         return response()->json($this->loadListing($listing));
@@ -166,6 +223,8 @@ class ListingController extends Controller
             'title' => ['sometimes', 'nullable', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
             'price' => ['sometimes', 'numeric', 'min:0'],
+            'use_base_reference_price' => ['sometimes', 'boolean'],
+            'refresh_base_reference' => ['sometimes', 'boolean'],
             'currency' => ['sometimes', 'string', 'size:3'],
             'quantity' => ['sometimes', 'integer', 'min:1'],
             'status' => ['sometimes', 'string', 'in:disponible,reservado,vendido,pausado'],
@@ -180,8 +239,24 @@ class ListingController extends Controller
 
         DB::transaction(function () use ($listing, $validated): void {
             $payload = collect($validated)
-                ->except(['items', 'images'])
+                ->except(['items', 'images', 'use_base_reference_price', 'refresh_base_reference'])
                 ->toArray();
+
+            $refreshBaseReference = (bool) ($validated['refresh_base_reference'] ?? false);
+
+            if (array_key_exists('card_print_id', $payload) || $refreshBaseReference) {
+                $cardPrintId = $payload['card_print_id'] ?? $listing->card_print_id;
+                $reference = $this->resolveBaseReference($cardPrintId);
+
+                $payload['base_reference_price'] = $reference['price'];
+                $payload['base_reference_source'] = $reference['source'];
+                $payload['base_reference_currency'] = $reference['currency'];
+                $payload['base_reference_updated_at'] = $reference['updated_at'];
+
+                if (($validated['use_base_reference_price'] ?? false) === true && ! is_null($reference['price'])) {
+                    $payload['price'] = $reference['price'];
+                }
+            }
 
             if (array_key_exists('currency', $payload) && ! is_null($payload['currency'])) {
                 $payload['currency'] = strtoupper($payload['currency']);
@@ -237,7 +312,7 @@ class ListingController extends Controller
         return $listing->load([
             'user:id,name',
             'user.profile:id,user_id,type,display_name',
-            'cardPrint:id,card_id,set_id,rarity,print_code,price_tcgplayer,price_cardmarket,image_url',
+            'cardPrint:id,card_id,set_id,rarity,print_code,price_cardmarket,image_url',
             'cardPrint.card:id,name,type,attribute,race,archetype',
             'cardPrint.set:id,code,name',
             'items:id,listing_id,card_print_id,quantity',

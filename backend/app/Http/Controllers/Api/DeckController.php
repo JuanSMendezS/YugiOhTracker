@@ -166,7 +166,7 @@ class DeckController extends Controller
         $cards = $version->cards->map(function ($deckCard) use (&$totalCost, &$sectionCounts): array {
             $unitPrice = (float) (CardPrint::query()
                 ->where('card_id', $deckCard->card_id)
-                ->selectRaw('MIN(COALESCE(price_tcgplayer, price_cardmarket, 0)) as min_price')
+                ->selectRaw('MIN(COALESCE(price_cardmarket, 0)) as min_price')
                 ->value('min_price') ?? 0);
 
             $lineTotal = $unitPrice * (int) $deckCard->quantity;

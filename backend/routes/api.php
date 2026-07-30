@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CatalogManagementController;
 use App\Http\Controllers\Api\CardCatalogController;
 use App\Http\Controllers\Api\CollectionController;
 use App\Http\Controllers\Api\DeckController;
 use App\Http\Controllers\Api\ListingController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PricingController;
 use App\Http\Controllers\Api\SetCatalogController;
 use App\Http\Controllers\Api\StoreInventoryController;
 use App\Http\Controllers\Api\WishlistController;
@@ -20,8 +22,10 @@ Route::prefix('auth')->group(function (): void {
 
 Route::get('/cards', [CardCatalogController::class, 'index']);
 Route::get('/sets', [SetCatalogController::class, 'index']);
+Route::get('/catalog/status', [CatalogManagementController::class, 'status']);
 Route::get('/listings', [ListingController::class, 'index']);
 Route::get('/listings/{listing}', [ListingController::class, 'show']);
+Route::get('/pricing/base', [PricingController::class, 'base']);
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/listings', [ListingController::class, 'store']);
@@ -50,6 +54,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::post('/orders/checkout', [OrderController::class, 'checkout']);
     Route::get('/orders/history', [OrderController::class, 'history']);
+
+    Route::post('/catalog/sync', [CatalogManagementController::class, 'sync']);
 });
 
 Route::get('/user', function (Request $request) {

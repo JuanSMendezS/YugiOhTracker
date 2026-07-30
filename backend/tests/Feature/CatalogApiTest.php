@@ -51,7 +51,7 @@ class CatalogApiTest extends TestCase
             'set_id' => $setRa->id,
             'rarity' => 'Ultra Rare',
             'print_code' => 'RA02-EN001',
-            'price_tcgplayer' => 5.00,
+            'price_cardmarket' => 5.00,
         ]);
 
         CardPrint::create([
@@ -59,7 +59,7 @@ class CatalogApiTest extends TestCase
             'set_id' => $setIn->id,
             'rarity' => 'Secret Rare',
             'print_code' => 'INFO-EN001',
-            'price_tcgplayer' => 6.50,
+            'price_cardmarket' => 6.50,
         ]);
 
         $response = $this->getJson('/api/cards?q=Blue&set_code=RA02');
@@ -94,5 +94,31 @@ class CatalogApiTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.code', 'LOB');
+    }
+
+    public function test_catalog_status_endpoint_reports_ready_state(): void
+    {
+        $set = Set::create([
+            'code' => 'LOB',
+            'name' => 'Legend of Blue Eyes White Dragon',
+        ]);
+
+        $card = Card::create([
+            'name' => 'Exodia the Forbidden One',
+        ]);
+
+        CardPrint::create([
+            'card_id' => $card->id,
+            'set_id' => $set->id,
+            'rarity' => 'Ultra Rare',
+            'print_code' => 'LOB-124',
+        ]);
+
+        $this->getJson('/api/catalog/status')
+            ->assertOk()
+            ->assertJsonPath('cards_count', 1)
+            ->assertJsonPath('sets_count', 1)
+            ->assertJsonPath('card_prints_count', 1)
+            ->assertJsonPath('is_catalog_ready', true);
     }
 }

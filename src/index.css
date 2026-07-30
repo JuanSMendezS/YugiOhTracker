@@ -15,10 +15,7 @@
   line-height: 1.45;
   font-weight: 400;
   color: var(--text);
-  background:
-    linear-gradient(160deg, rgba(42, 96, 210, 0.06), transparent 44%),
-    linear-gradient(350deg, rgba(237, 136, 87, 0.09), transparent 45%),
-    var(--bg);
+  background: var(--bg);
   min-height: 100%;
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;

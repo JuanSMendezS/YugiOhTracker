@@ -28,7 +28,7 @@ class Phase6ApiTest extends TestCase
             'set_id' => $set->id,
             'rarity' => 'Ultra Rare',
             'print_code' => 'LOB-005',
-            'price_tcgplayer' => 4.25,
+            'price_cardmarket' => 4.25,
         ]);
 
         $created = $this->postJson('/api/collection/items', [
@@ -105,7 +105,7 @@ class Phase6ApiTest extends TestCase
             'set_id' => $set->id,
             'rarity' => 'Ultra Rare',
             'print_code' => 'SDK-001',
-            'price_tcgplayer' => 3.00,
+            'price_cardmarket' => 3.00,
         ]);
 
         CardPrint::create([
@@ -113,7 +113,7 @@ class Phase6ApiTest extends TestCase
             'set_id' => $set->id,
             'rarity' => 'Super Rare',
             'print_code' => 'SDK-002',
-            'price_tcgplayer' => 1.50,
+            'price_cardmarket' => 1.50,
         ]);
 
         $deck = $this->postJson('/api/decks', [

@@ -16,13 +16,13 @@ class CollectionController extends Controller
 
         $collection->load([
             'items:id,collection_id,card_print_id,quantity,condition,language,is_foil,notes',
-            'items.cardPrint:id,card_id,set_id,rarity,print_code,price_tcgplayer,price_cardmarket,image_url',
+            'items.cardPrint:id,card_id,set_id,rarity,print_code,price_cardmarket,image_url',
             'items.cardPrint.card:id,name,type,attribute,race,archetype',
             'items.cardPrint.set:id,code,name',
         ]);
 
         $estimatedValue = $collection->items->sum(function (CollectionItem $item): float {
-            $unitPrice = (float) ($item->cardPrint?->price_tcgplayer ?? $item->cardPrint?->price_cardmarket ?? 0);
+            $unitPrice = (float) ($item->cardPrint?->price_cardmarket ?? 0);
             return $unitPrice * (int) $item->quantity;
         });
 
@@ -116,7 +116,7 @@ class CollectionController extends Controller
     private function loadItem(CollectionItem $item): CollectionItem
     {
         return $item->load([
-            'cardPrint:id,card_id,set_id,rarity,print_code,price_tcgplayer,price_cardmarket,image_url',
+            'cardPrint:id,card_id,set_id,rarity,print_code,price_cardmarket,image_url',
             'cardPrint.card:id,name,type,attribute,race,archetype',
             'cardPrint.set:id,code,name',
         ]);

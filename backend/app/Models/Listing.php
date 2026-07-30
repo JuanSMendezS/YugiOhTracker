@@ -18,10 +18,18 @@ class Listing extends Model
         'description',
         'price',
         'currency',
+        'base_reference_price',
+        'base_reference_source',
+        'base_reference_currency',
+        'base_reference_updated_at',
         'quantity',
         'status',
         'condition',
         'language',
+    ];
+
+    protected $casts = [
+        'base_reference_updated_at' => 'datetime',
     ];
 
     public function user()

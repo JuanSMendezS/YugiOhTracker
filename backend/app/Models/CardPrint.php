@@ -16,7 +16,6 @@ class CardPrint extends Model
         'rarity',
         'rarity_code',
         'print_code',
-        'price_tcgplayer',
         'price_cardmarket',
         'image_url',
     ];

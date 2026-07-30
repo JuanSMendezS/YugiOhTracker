@@ -126,22 +126,20 @@ class SyncCatalog extends Command
                         $imageUrl = $cardData['card_images'][0]['image_url'];
                     }
                     
-                    $priceTcg = isset($setData['set_price']) && is_numeric($setData['set_price']) ? (float)$setData['set_price'] : 0.00;
-                    
-                    // Fallback to general card prices if set price is 0
-                    if ($priceTcg == 0.00 && isset($cardData['card_prices'][0]['tcgplayer_price'])) {
-                        $priceTcg = (float)$cardData['card_prices'][0]['tcgplayer_price'];
-                    }
-                    
+                    $setPrice = isset($setData['set_price']) && is_numeric($setData['set_price']) ? (float)$setData['set_price'] : 0.00;
+
                     $priceCm = 0.00;
                     if (isset($cardData['card_prices'][0]['cardmarket_price'])) {
                         $priceCm = (float)$cardData['card_prices'][0]['cardmarket_price'];
+                    }
+
+                    if ($priceCm == 0.00 && $setPrice > 0.00) {
+                        $priceCm = $setPrice;
                     }
                     
                     if (isset($existingPrints[$printCode])) {
                         $updatedPrints[] = [
                             'id' => $existingPrints[$printCode],
-                            'price_tcgplayer' => $priceTcg,
                             'price_cardmarket' => $priceCm,
                             'image_url' => $imageUrl,
                             'updated_at' => now(),
@@ -155,7 +153,6 @@ class SyncCatalog extends Command
                             'rarity' => $setData['set_rarity'] ?? 'Common',
                             'rarity_code' => $setData['set_rarity_code'] ?? null,
                             'print_code' => $printCode,
-                            'price_tcgplayer' => $priceTcg,
                             'price_cardmarket' => $priceCm,
                             'image_url' => $imageUrl,
                             'created_at' => now(),
@@ -201,7 +198,6 @@ class SyncCatalog extends Command
                     DB::table('card_prints')
                         ->where('id', $print['id'])
                         ->update([
-                            'price_tcgplayer' => $print['price_tcgplayer'],
                             'price_cardmarket' => $print['price_cardmarket'],
                             'image_url' => $print['image_url'],
                             'updated_at' => $print['updated_at'],

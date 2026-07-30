@@ -26,7 +26,7 @@ class StoreInventoryController extends Controller
         $query = Listing::query()
             ->where('user_id', $user->id)
             ->with([
-                'cardPrint:id,card_id,set_id,rarity,print_code,price_tcgplayer,price_cardmarket,image_url',
+                'cardPrint:id,card_id,set_id,rarity,print_code,price_cardmarket,image_url',
                 'cardPrint.card:id,name,type,attribute,race,archetype',
                 'cardPrint.set:id,code,name',
                 'items:id,listing_id,card_print_id,quantity',
