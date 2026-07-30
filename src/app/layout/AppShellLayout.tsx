@@ -12,10 +12,24 @@ function AppShellLayout() {
   useEffect(() => {
     let disposed = false
 
-    fetch('/api/user', { credentials: 'include' })
+    fetch('/api/session', {
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
       .then(async (response) => {
         if (!disposed) {
-          setSessionUser(response.ok ? ((await response.json()) as ApiUser) : null)
+          if (!response.ok) {
+            setSessionUser(null)
+            return
+          }
+
+          const payload = (await response.json()) as {
+            authenticated?: boolean
+            user?: ApiUser | null
+          }
+          setSessionUser(payload.authenticated ? (payload.user ?? null) : null)
         }
       })
       .catch(() => {

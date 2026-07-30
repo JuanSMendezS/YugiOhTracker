@@ -27,6 +27,15 @@ Route::get('/listings', [ListingController::class, 'index']);
 Route::get('/listings/{listing}', [ListingController::class, 'show']);
 Route::get('/pricing/base', [PricingController::class, 'base']);
 
+Route::get('/session', function (Request $request) {
+    $user = $request->user();
+
+    return response()->json([
+        'authenticated' => (bool) $user,
+        'user' => $user?->load('profile'),
+    ]);
+});
+
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/listings', [ListingController::class, 'store']);
     Route::put('/listings/{listing}', [ListingController::class, 'update']);

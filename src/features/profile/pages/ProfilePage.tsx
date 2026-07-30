@@ -9,8 +9,11 @@ import {
   Card,
   CardContent,
   Checkbox,
+  Fade,
   FormControlLabel,
   MenuItem,
+  ToggleButton,
+  ToggleButtonGroup,
   Stack,
   TextField,
   Typography,
@@ -20,6 +23,8 @@ import { api, ensureCsrfCookie } from '../../../lib/api'
 import type { ApiProfile, ApiUser } from '../../../types/app'
 
 function ProfilePage() {
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
+
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(true)
@@ -37,9 +42,9 @@ function ProfilePage() {
   async function loadSession() {
     setIsLoading(true)
     try {
-      const response = await api.get<ApiUser>('/user')
-      setUser(response.data)
-      setProfile(response.data ? response.data.profile : null)
+      const response = await api.get<{ authenticated: boolean; user: ApiUser | null }>('/session')
+      setUser(response.data.user)
+      setProfile(response.data.user?.profile ?? null)
     } catch {
       setUser(null)
       setProfile(null)
@@ -118,42 +123,68 @@ function ProfilePage() {
 
       {statusText ? <Alert severity="info">{statusText}</Alert> : null}
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, alignItems: 'start' }}>
+      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr' }, alignItems: 'start' }}>
         <Card>
           <CardContent>
-            <Stack spacing={1.5}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Iniciar sesion
-              </Typography>
-              <TextField label="Email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} fullWidth />
-              <TextField label="Contraseña" type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} fullWidth />
-              <FormControlLabel
-                control={<Checkbox checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} />}
-                label="Mantener sesion iniciada"
-              />
-              <Button variant="contained" startIcon={<LoginRoundedIcon />} onClick={() => void handleLogin()}>
-                Entrar
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
+            <Stack spacing={1.5} sx={{ maxWidth: 560 }}>
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={1}
+                sx={{ alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between' }}
+              >
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  {authMode === 'login' ? 'Iniciar sesion' : 'Crear cuenta'}
+                </Typography>
 
-        <Card>
-          <CardContent>
-            <Stack spacing={1.5}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Crear cuenta
-              </Typography>
-              <TextField label="Nombre" value={registerName} onChange={(event) => setRegisterName(event.target.value)} fullWidth />
-              <TextField label="Email" value={registerEmail} onChange={(event) => setRegisterEmail(event.target.value)} fullWidth />
-              <TextField label="Contraseña" type="password" value={registerPassword} onChange={(event) => setRegisterPassword(event.target.value)} fullWidth />
-              <TextField select label="Tipo de perfil" value={registerType} onChange={(event) => setRegisterType(event.target.value as 'duelista' | 'tienda')}>
-                <MenuItem value="duelista">Duelista</MenuItem>
-                <MenuItem value="tienda">Tienda</MenuItem>
-              </TextField>
-              <Button variant="outlined" startIcon={<PersonAddAltRoundedIcon />} onClick={() => void handleRegister()}>
-                Crear cuenta
-              </Button>
+                <ToggleButtonGroup
+                  value={authMode}
+                  exclusive
+                  size="small"
+                  onChange={(_, value: 'login' | 'register' | null) => {
+                    if (value) {
+                      setAuthMode(value)
+                    }
+                  }}
+                >
+                  <ToggleButton value="login">Iniciar sesion</ToggleButton>
+                  <ToggleButton value="register">Crear cuenta</ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+
+              <Fade in={authMode === 'login'} timeout={220} unmountOnExit>
+                <Stack spacing={1.5}>
+                  <TextField label="Email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} fullWidth />
+                  <TextField label="Contraseña" type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} fullWidth />
+                  <FormControlLabel
+                    control={<Checkbox checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} />}
+                    label="Mantener sesion iniciada"
+                  />
+                  <Button variant="contained" startIcon={<LoginRoundedIcon />} onClick={() => void handleLogin()}>
+                    Entrar
+                  </Button>
+                  <Button variant="text" onClick={() => setAuthMode('register')} sx={{ alignSelf: 'flex-start' }}>
+                    ¿No tienes cuenta? Crear cuenta
+                  </Button>
+                </Stack>
+              </Fade>
+
+              <Fade in={authMode === 'register'} timeout={220} unmountOnExit>
+                <Stack spacing={1.5}>
+                  <TextField label="Nombre" value={registerName} onChange={(event) => setRegisterName(event.target.value)} fullWidth />
+                  <TextField label="Email" value={registerEmail} onChange={(event) => setRegisterEmail(event.target.value)} fullWidth />
+                  <TextField label="Contraseña" type="password" value={registerPassword} onChange={(event) => setRegisterPassword(event.target.value)} fullWidth />
+                  <TextField select label="Tipo de perfil" value={registerType} onChange={(event) => setRegisterType(event.target.value as 'duelista' | 'tienda')}>
+                    <MenuItem value="duelista">Duelista</MenuItem>
+                    <MenuItem value="tienda">Tienda</MenuItem>
+                  </TextField>
+                  <Button variant="contained" startIcon={<PersonAddAltRoundedIcon />} onClick={() => void handleRegister()}>
+                    Crear cuenta
+                  </Button>
+                  <Button variant="text" onClick={() => setAuthMode('login')} sx={{ alignSelf: 'flex-start' }}>
+                    Ya tengo cuenta. Iniciar sesion
+                  </Button>
+                </Stack>
+              </Fade>
             </Stack>
           </CardContent>
         </Card>
