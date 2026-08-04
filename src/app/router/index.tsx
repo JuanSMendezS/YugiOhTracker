@@ -1,7 +1,9 @@
 import { Box, Button, Stack, Typography } from '@mui/material'
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom'
 import AppShellLayout from '../layout/AppShellLayout'
+import SessionProvider from '../providers/SessionProvider'
 import AppThemeProvider from '../providers/ThemeProvider'
+import { RequireAuth, RequireStore } from './RouteGuards'
 import CatalogPage from '../../features/catalog/pages/CatalogPage'
 import CardDetailPage from '../../features/card-detail/pages/CardDetailPage'
 import CollectionPage from '../../features/collection/pages/CollectionPage'
@@ -38,10 +40,32 @@ const router = createBrowserRouter([
       { path: 'catalog', element: <CatalogPage /> },
       { path: 'catalog/:cardId', element: <CardDetailPage /> },
       { path: 'marketplace', element: <MarketplacePage /> },
-      { path: 'collection', element: <CollectionPage /> },
-      { path: 'deck-builder', element: <DeckBuilderPage /> },
+      {
+        path: 'collection',
+        element: (
+          <RequireAuth>
+            <CollectionPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: 'deck-builder',
+        element: (
+          <RequireAuth>
+            <DeckBuilderPage />
+          </RequireAuth>
+        ),
+      },
       { path: 'prices', element: <PricesPage /> },
       { path: 'profile', element: <ProfilePage /> },
+      {
+        path: 'store/tu-tienda',
+        element: (
+          <RequireStore>
+            <StoreProfilePage />
+          </RequireStore>
+        ),
+      },
       { path: 'store/:storeId', element: <StoreProfilePage /> },
       { path: 'store/:storeId/landing', element: <StoreLandingPage /> },
       { path: 'legacy', element: <LegacyWorkspacePage /> },
@@ -53,9 +77,11 @@ const router = createBrowserRouter([
 function AppRouter() {
   return (
     <AppThemeProvider>
-      <Box sx={{ minHeight: '100svh' }}>
-        <RouterProvider router={router} />
-      </Box>
+      <SessionProvider>
+        <Box sx={{ minHeight: '100svh' }}>
+          <RouterProvider router={router} />
+        </Box>
+      </SessionProvider>
     </AppThemeProvider>
   )
 }

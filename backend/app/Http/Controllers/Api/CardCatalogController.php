@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Card;
+use App\Models\CardPrint;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,15 +33,29 @@ class CardCatalogController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = Card::query()->withCount('prints');
+        $query = Card::query()
+            ->withCount('prints')
+            ->with(['prints' => function ($builder): void {
+                $builder
+                    ->select('id', 'card_id', 'set_id', 'rarity', 'print_code', 'price_cardmarket', 'image_url')
+                    ->orderBy('print_code');
+            }, 'prints.set:id,code,name']);
 
         if (! empty($validated['q'])) {
-            $searchTerm = $validated['q'];
-            $query->where(function ($builder) use ($searchTerm): void {
-                $builder
-                    ->where('name', 'like', "%{$searchTerm}%")
-                    ->orWhere('description', 'like', "%{$searchTerm}%")
-                    ->orWhere('archetype', 'like', "%{$searchTerm}%");
+            $searchTerms = collect(preg_split('/\s+/', trim($validated['q'])) ?: [])
+                ->filter(fn ($term): bool => $term !== '')
+                ->values();
+
+            $query->where(function ($builder) use ($searchTerms): void {
+                foreach ($searchTerms as $searchTerm) {
+                    $builder
+                        ->orWhere('name', 'like', "%{$searchTerm}%")
+                        ->orWhere('description', 'like', "%{$searchTerm}%")
+                        ->orWhere('archetype', 'like', "%{$searchTerm}%")
+                        ->orWhere('type', 'like', "%{$searchTerm}%")
+                        ->orWhere('race', 'like', "%{$searchTerm}%")
+                        ->orWhere('attribute', 'like', "%{$searchTerm}%");
+                }
             });
         }
 
@@ -103,6 +118,42 @@ class CardCatalogController extends Controller
             ->orderBy($sortBy, $sortDir)
             ->paginate($perPage)
             ->appends($request->query());
+
+        $cards->through(function (Card $card): array {
+            $firstPrint = $card->prints->first();
+            $lowestPrice = CardPrint::query()
+                ->where('card_id', $card->id)
+                ->min('price_cardmarket');
+
+            return [
+                'id' => $card->id,
+                'name' => $card->name,
+                'type' => $card->type,
+                'frameType' => $card->frame_type,
+                'desc' => $card->description,
+                'atk' => $card->atk,
+                'def' => $card->def,
+                'level' => $card->level,
+                'attribute' => $card->attribute,
+                'race' => $card->race,
+                'archetype' => $card->archetype,
+                'prints_count' => $card->prints_count,
+                'card_sets' => $card->prints->map(fn ($print): array => [
+                    'set_name' => $print->set?->name ?? '',
+                    'set_code' => $print->set?->code ?? '',
+                    'set_rarity' => $print->rarity,
+                    'set_price' => $print->price_cardmarket !== null ? (string) $print->price_cardmarket : null,
+                ])->values(),
+                'card_images' => $firstPrint?->image_url ? [[
+                    'image_url' => $firstPrint->image_url,
+                    'image_url_small' => $firstPrint->image_url,
+                    'image_url_cropped' => $firstPrint->image_url,
+                ]] : [],
+                'card_prices' => [[
+                    'cardmarket_price' => $lowestPrice !== null ? (string) $lowestPrice : '0',
+                ]],
+            ];
+        });
 
         return response()->json($cards);
     }

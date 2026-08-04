@@ -7,12 +7,13 @@ import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import StyleRoundedIcon from '@mui/icons-material/StyleRounded'
 import ViewModuleRoundedIcon from '@mui/icons-material/ViewModuleRounded'
 import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Typography } from '@mui/material'
+import type { ReactElement } from 'react'
 import { NavLink } from 'react-router-dom'
 
 type NavItem = {
   to: string
   label: string
-  icon: JSX.Element
+  icon: ReactElement
   requiresAuth?: boolean
   requiresStore?: boolean
 }

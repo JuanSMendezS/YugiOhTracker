@@ -11,14 +11,22 @@ use App\Http\Controllers\Api\PricingController;
 use App\Http\Controllers\Api\SetCatalogController;
 use App\Http\Controllers\Api\StoreInventoryController;
 use App\Http\Controllers\Api\WishlistController;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('auth')->group(function (): void {
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
-});
+Route::middleware(['web'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->prefix('auth')
+    ->group(function (): void {
+        Route::post('/register', [AuthController::class, 'register']);
+        Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/demo-accounts', [AuthController::class, 'demoAccounts']);
+    });
+
+Route::middleware(['web', 'auth:sanctum'])
+    ->withoutMiddleware([VerifyCsrfToken::class])
+    ->post('/auth/logout', [AuthController::class, 'logout']);
 
 Route::get('/cards', [CardCatalogController::class, 'index']);
 Route::get('/sets', [SetCatalogController::class, 'index']);

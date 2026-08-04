@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Card;
 use App\Models\CardPrint;
 use App\Models\Set;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -68,6 +69,44 @@ class CatalogApiTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.name', 'Blue-Eyes White Dragon');
+    }
+
+    public function test_cards_endpoint_matches_any_term_from_multi_word_search(): void
+    {
+        $card = Card::create([
+            'name' => 'Dark Magician',
+            'type' => 'Effect Monster',
+            'attribute' => 'DARK',
+            'race' => 'Spellcaster',
+        ]);
+
+        $set = Set::create([
+            'code' => 'SDK',
+            'name' => 'Starter Deck Kaiba',
+        ]);
+
+        CardPrint::create([
+            'card_id' => $card->id,
+            'set_id' => $set->id,
+            'rarity' => 'Common',
+            'print_code' => 'SDK-002',
+            'price_cardmarket' => 1.75,
+        ]);
+
+        $this->getJson('/api/cards?q=dark spellcaster')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Dark Magician');
+    }
+
+    public function test_database_seeder_populates_catalog_with_sample_cards(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
+
+        $this->assertGreaterThan(0, Card::count());
+        $this->assertGreaterThan(0, Set::count());
+        $this->assertGreaterThan(0, CardPrint::count());
     }
 
     public function test_sets_endpoint_supports_card_name_filter(): void

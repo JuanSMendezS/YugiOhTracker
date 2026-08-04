@@ -11,7 +11,7 @@ export type DeckDraftCard = {
 
 export type DeckBuilderCard = ApiCard
 
-export async function fetchDeckBuilderCards(params: { q: string; page: number; perPage: number }): Promise<Paginated<ApiCard>> {
+export async function fetchDeckBuilderCards(params: { q?: string; page: number; perPage: number }): Promise<Paginated<ApiCard>> {
   const response = await api.get<Paginated<ApiCard>>('/cards', {
     params: {
       q: params.q || undefined,
@@ -32,10 +32,11 @@ export async function fetchDeck(deckId: string): Promise<DeckDetail> {
   return response.data
 }
 
-export async function createDeck(payload: { name: string; description?: string; cards: DeckDraftCard[] }) {
+export async function createDeck(payload: { name: string; description?: string; initialVersionName?: string; cards: DeckDraftCard[] }) {
   const response = await api.post<DeckDetail>('/decks', {
     name: payload.name,
     description: payload.description ?? null,
+    initial_version_name: payload.initialVersionName?.trim() || undefined,
     cards: payload.cards,
   })
   return response.data

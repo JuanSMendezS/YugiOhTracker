@@ -1,50 +1,13 @@
 import { Box, Drawer } from '@mui/material'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import type { ApiUser } from '../../types/app'
+import { useSession } from '../providers/SessionProvider'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
 function AppShellLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [sessionUser, setSessionUser] = useState<ApiUser | null>(null)
-
-  useEffect(() => {
-    let disposed = false
-
-    fetch('/api/session', {
-      credentials: 'include',
-      headers: {
-        Accept: 'application/json',
-      },
-    })
-      .then(async (response) => {
-        if (!disposed) {
-          if (!response.ok) {
-            setSessionUser(null)
-            return
-          }
-
-          const payload = (await response.json()) as {
-            authenticated?: boolean
-            user?: ApiUser | null
-          }
-          setSessionUser(payload.authenticated ? (payload.user ?? null) : null)
-        }
-      })
-      .catch(() => {
-        if (!disposed) {
-          setSessionUser(null)
-        }
-      })
-
-    return () => {
-      disposed = true
-    }
-  }, [])
-
-  const isAuthenticated = Boolean(sessionUser)
-  const isStore = sessionUser?.profile?.type === 'tienda'
+  const { isAuthenticated, isStore } = useSession()
 
   return (
     <Box sx={{ minHeight: '100svh', display: 'flex', backgroundColor: 'background.default' }}>

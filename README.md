@@ -156,3 +156,11 @@ Notas de precio en publicaciones:
 
 - GET /api/catalog/status
 - POST /api/catalog/sync
+
+### Cuentas
+- Duelista:
+- - Email: demo.duelista@yugiohtracker.test
+- - Contraseña: Demo1234!
+- Tienda:
+- - Email: demo.tienda@yugiohtracker.test
+- - Contraseña: Demo1234!

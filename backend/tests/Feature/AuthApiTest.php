@@ -63,4 +63,39 @@ class AuthApiTest extends TestCase
 
         $this->assertCount(0, $user->fresh()->tokens);
     }
+
+    public function test_demo_accounts_are_created_for_each_profile_type(): void
+    {
+        $response = $this->postJson('/api/auth/demo-accounts');
+
+        $response
+            ->assertOk()
+            ->assertJsonStructure([
+                'message',
+                'accounts' => [
+                    ['email', 'password', 'type'],
+                    ['email', 'password', 'type'],
+                ],
+            ]);
+
+        $this->assertDatabaseHas('users', ['email' => 'demo.duelista@yugiohtracker.test']);
+        $this->assertDatabaseHas('profiles', ['type' => 'duelista']);
+        $this->assertDatabaseHas('users', ['email' => 'demo.tienda@yugiohtracker.test']);
+        $this->assertDatabaseHas('profiles', ['type' => 'tienda']);
+    }
+
+    public function test_demo_credentials_can_log_in_and_create_the_account(): void
+    {
+        $response = $this->postJson('/api/auth/login', [
+            'email' => 'demo.duelista@yugiohtracker.test',
+            'password' => 'Demo1234!',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('profile.type', 'duelista');
+
+        $this->assertDatabaseHas('users', ['email' => 'demo.duelista@yugiohtracker.test']);
+        $this->assertDatabaseHas('profiles', ['type' => 'duelista']);
+    }
 }

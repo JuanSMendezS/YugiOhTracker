@@ -12,10 +12,7 @@ import {
   CardContent,
   Chip,
   Divider,
-  FormControl,
-  InputLabel,
   MenuItem,
-  Select,
   Skeleton,
   Stack,
   TextField,
@@ -24,7 +21,8 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../../lib/api'
-import type { ApiCard, ApiUser, DeckDetail, DeckSummary, Paginated } from '../../../types/app'
+import type { ApiCard, ApiUser, DeckDetail, DeckSummary } from '../../../types/app'
+import { fetchCatalogCards } from '../../catalog/services/catalogApi'
 import {
   createDeck,
   createDeckVersion,
@@ -49,6 +47,35 @@ function summarizeZone(cards: BuilderItem[], zone: DeckZone) {
   return cards.filter((entry) => entry.zone === zone).reduce((total, entry) => total + entry.quantity, 0)
 }
 
+function matchesSearchTerms(card: ApiCard, normalizedSearch: string) {
+  if (!normalizedSearch) {
+    return true
+  }
+
+  const terms = normalizedSearch.split(/\s+/).filter(Boolean)
+  if (terms.length === 0) {
+    return true
+  }
+
+  const searchableText = [card.name, card.type, card.attribute, card.race, card.archetype]
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+    .toLowerCase()
+
+  return terms.some((term) => searchableText.includes(term))
+}
+
+function inferDeckZone(card: ApiCard): DeckZone {
+  const frameType = (card.frameType ?? '').toLowerCase()
+  const cardType = (card.type ?? '').toLowerCase()
+
+  if (['fusion', 'synchro', 'xyz', 'link'].some((value) => frameType.includes(value) || cardType.includes(value))) {
+    return 'extra'
+  }
+
+  return 'main'
+}
+
 function DeckBuilderPage() {
   const navigate = useNavigate()
 
@@ -63,13 +90,13 @@ function DeckBuilderPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [deckSearchQuery, setDeckSearchQuery] = useState('')
   const [cardTypeFilter, setCardTypeFilter] = useState('')
-  const [selectedZone, setSelectedZone] = useState<DeckZone>('main')
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null)
   const [draggedZone, setDraggedZone] = useState<DeckZone | null>(null)
+  const [previewCardId, setPreviewCardId] = useState<string | null>(null)
   const [draftCardQty, setDraftCardQty] = useState('1')
-  const [draftCardId, setDraftCardId] = useState('')
   const [deckName, setDeckName] = useState('')
   const [deckDescription, setDeckDescription] = useState('')
+  const [initialVersionName, setInitialVersionName] = useState('V1')
   const [versionName, setVersionName] = useState('V2')
   const [copyFromVersionId, setCopyFromVersionId] = useState('')
   const [statusText, setStatusText] = useState<string | null>(null)
@@ -93,10 +120,19 @@ function DeckBuilderPage() {
   }
 
   async function loadCards() {
+    const normalizedSearch = searchQuery.trim().toLowerCase()
+
     setIsLoadingCards(true)
     try {
-      const response = await fetchDeckBuilderCards({ q: searchQuery, page: 1, perPage: 48 })
-      const nextCards = response.data.filter((card) => (card.type ?? '').toLowerCase().includes(cardTypeFilter.toLowerCase()) || !cardTypeFilter)
+      const cardsSource = normalizedSearch
+        ? (await fetchCatalogCards({ query: normalizedSearch, page: 1, pageSize: 48 })).cards
+        : (await fetchDeckBuilderCards({ q: undefined, page: 1, perPage: 48 })).data
+
+      const nextCards = cardsSource.filter((card) => {
+        const matchesType = !cardTypeFilter || (card.type ?? '').toLowerCase().includes(cardTypeFilter.toLowerCase())
+        return matchesType && matchesSearchTerms(card, normalizedSearch)
+      })
+
       setCards(nextCards)
     } catch (error: unknown) {
       setErrorText(error instanceof Error ? error.message : 'No se pudieron cargar las cartas del builder')
@@ -132,6 +168,16 @@ function DeckBuilderPage() {
   }, [searchQuery, cardTypeFilter])
 
   const filteredCards = useMemo(() => cards, [cards])
+  const previewCard = useMemo(() => {
+    if (previewCardId) {
+      const exact = filteredCards.find((entry) => entry.id === previewCardId)
+      if (exact) {
+        return exact
+      }
+    }
+
+    return filteredCards[0] ?? null
+  }, [filteredCards, previewCardId])
   const visibleDecks = useMemo(() => {
     const normalized = deckSearchQuery.trim().toLowerCase()
     if (!normalized) {
@@ -170,17 +216,15 @@ function DeckBuilderPage() {
     setDraftCards((current) => current.filter((entry) => entry.card.id !== cardId))
   }
 
-  function addSelectedCard() {
-    const card = cards.find((entry) => entry.id === draftCardId)
+  function addCardToDraft(card: ApiCard) {
     const quantity = Number(draftCardQty)
-    if (!card || !Number.isFinite(quantity) || quantity < 1) {
-      setErrorText('Selecciona una carta y una cantidad valida para agregarla.')
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      setErrorText('Escribe una cantidad valida para agregar cartas.')
       return
     }
 
-    upsertDraftCard(card, quantity, selectedZone)
-    setDraftCardId('')
-    setDraftCardQty('1')
+    upsertDraftCard(card, quantity, inferDeckZone(card))
+    setPreviewCardId(card.id)
   }
 
   async function handleCreateDeck() {
@@ -202,11 +246,17 @@ function DeckBuilderPage() {
         quantity: entry.quantity,
         section: entry.zone,
       }))
-      const created = await createDeck({ name: deckName.trim(), description: deckDescription.trim(), cards: payload })
+      const created = await createDeck({
+        name: deckName.trim(),
+        description: deckDescription.trim(),
+        initialVersionName: initialVersionName.trim() || 'V1',
+        cards: payload,
+      })
       setSelectedDeck(created)
       setStatusText('Deck creado correctamente.')
       setDeckName('')
       setDeckDescription('')
+      setInitialVersionName('V1')
       await loadDecks()
     } catch (error: unknown) {
       setErrorText(error instanceof Error ? error.message : 'No se pudo crear el deck')
@@ -304,7 +354,7 @@ function DeckBuilderPage() {
       {errorText ? <Alert severity="error">{errorText}</Alert> : null}
       {statusText ? <Alert severity="success">{statusText}</Alert> : null}
 
-      <Box sx={{ display: 'grid', gap: 1.2, gridTemplateColumns: { xs: '1fr', md: 'repeat(4, minmax(0,1fr))' } }}>
+      <Box sx={{ display: 'grid', gap: 1.2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0,1fr))', lg: 'repeat(4, minmax(0,1fr))' } }}>
         {[
           { label: 'Main', value: mainCount },
           { label: 'Extra', value: extraCount },
@@ -324,112 +374,142 @@ function DeckBuilderPage() {
         ))}
       </Box>
 
-      <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', xl: '280px minmax(0,1fr) 320px' }, alignItems: 'start' }}>
-        <Card sx={{ position: { xl: 'sticky' }, top: { xl: 92 } }}>
-          <CardContent>
-            <Stack spacing={1.2}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Buscar cartas
-              </Typography>
-              <TextField label="Buscar" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Nombre, arquetipo..." />
-              <TextField
-                select
-                label="Tipo"
-                value={cardTypeFilter}
-                onChange={(event) => setCardTypeFilter(event.target.value)}
-              >
-                <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="Monster">Monster</MenuItem>
-                <MenuItem value="Spell">Spell</MenuItem>
-                <MenuItem value="Trap">Trap</MenuItem>
-              </TextField>
-
-              <Autocomplete
-                options={filteredCards}
-                getOptionLabel={(option) => option.name}
-                value={filteredCards.find((entry) => entry.id === draftCardId) ?? null}
-                onChange={(_, value) => setDraftCardId(value?.id ?? '')}
-                renderInput={(params) => <TextField {...params} label="Carta seleccionada" placeholder="Elige una carta" />}
-              />
-
-              <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: '1fr 140px' }}>
-                <TextField label="Cantidad" value={draftCardQty} onChange={(event) => setDraftCardQty(event.target.value)} inputMode="numeric" />
-                <Button variant="outlined" onClick={addSelectedCard} startIcon={<AddRoundedIcon />}>
-                  Agregar
-                </Button>
-              </Box>
-
-              <FormControl fullWidth>
-                <InputLabel>Zona destino</InputLabel>
-                <Select label="Zona destino" value={selectedZone} onChange={(event) => setSelectedZone(event.target.value as DeckZone)}>
-                  <MenuItem value="main">Main</MenuItem>
-                  <MenuItem value="extra">Extra</MenuItem>
-                  <MenuItem value="side">Side</MenuItem>
-                </Select>
-              </FormControl>
-
-              <Divider />
-
-              <Typography variant="body2" color="text.secondary">
-                Arrastra una carta desde la lista al deck o usa el boton Agregar.
-              </Typography>
-
-              {isLoadingCards ? (
-                <Stack spacing={0.8}>
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <Skeleton key={index} variant="rounded" height={74} />
-                  ))}
-                </Stack>
-              ) : (
-                <Stack spacing={0.8} sx={{ maxHeight: 660, overflow: 'auto' }}>
-                  {filteredCards.map((card) => (
-                    <Card
-                      key={card.id}
-                      variant="outlined"
-                      draggable
-                      onDragStart={() => handleDragStart(card)}
-                      sx={{ cursor: 'grab' }}
-                    >
-                      <CardContent sx={{ py: '10px !important' }}>
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                          <DragIndicatorRoundedIcon fontSize="small" />
-                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
-                              {card.name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap>
-                              {card.type ?? 'Sin tipo'} · {card.attribute ?? 'Sin atributo'}
-                            </Typography>
-                          </Box>
-                          <Button
-                            size="small"
-                            startIcon={<AddRoundedIcon />}
-                            onClick={() => upsertDraftCard(card, 1, selectedZone)}
-                          >
-                            Agregar
-                          </Button>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Stack>
-              )}
-            </Stack>
-          </CardContent>
-        </Card>
-
+      <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', xl: 'minmax(0,1fr) 320px' }, alignItems: 'start' }}>
         <Stack spacing={1.5}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 120px' } }}>
+              <Stack spacing={1.2}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Buscar cartas
+                </Typography>
+
+                <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', lg: 'minmax(0,1fr) 220px' }, alignItems: 'start' }}>
+                  <Stack spacing={1.2}>
+                    <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr', md: 'minmax(0,1.4fr) minmax(180px,0.8fr) 120px' } }}>
+                      <TextField label="Buscar" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Nombre, arquetipo..." />
+                      <TextField
+                        select
+                        label="Tipo"
+                        value={cardTypeFilter}
+                        onChange={(event) => setCardTypeFilter(event.target.value)}
+                      >
+                        <MenuItem value="">Todos</MenuItem>
+                        <MenuItem value="Monster">Monster</MenuItem>
+                        <MenuItem value="Spell">Spell</MenuItem>
+                        <MenuItem value="Trap">Trap</MenuItem>
+                      </TextField>
+                      <TextField label="Cantidad" value={draftCardQty} onChange={(event) => setDraftCardQty(event.target.value)} inputMode="numeric" />
+                    </Box>
+
+                    <Typography variant="body2" color="text.secondary">
+                      Main y Extra se asignan automaticamente segun el tipo de carta. Side Deck se gestiona moviendo cartas despues de agregarlas.
+                    </Typography>
+
+                    <Typography variant="body2" color="text.secondary">
+                      Arrastra una carta desde la lista al deck o usa el boton Agregar.
+                    </Typography>
+
+                    {isLoadingCards ? (
+                      <Stack spacing={0.8}>
+                        {Array.from({ length: 5 }).map((_, index) => (
+                          <Skeleton key={index} variant="rounded" height={78} />
+                        ))}
+                      </Stack>
+                    ) : (
+                      <Box
+                        sx={{
+                          maxHeight: { xs: 340, md: 420, lg: 520 },
+                          overflow: 'auto',
+                          pr: 0.5,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          backgroundColor: 'rgba(255,255,255,0.02)',
+                        }}
+                      >
+                        <Stack spacing={0.8} sx={{ p: 1 }}>
+                          {filteredCards.map((card) => (
+                            <Card
+                              key={card.id}
+                              variant="outlined"
+                              draggable
+                              onDragStart={() => handleDragStart(card)}
+                              onMouseEnter={() => setPreviewCardId(card.id)}
+                              sx={{ cursor: 'grab', minHeight: 78, display: 'flex', alignItems: 'center' }}
+                            >
+                              <CardContent sx={{ py: '10px !important', width: '100%' }}>
+                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                  <DragIndicatorRoundedIcon fontSize="small" />
+                                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
+                                      {card.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" noWrap>
+                                      {card.type ?? 'Sin tipo'} · {card.attribute ?? 'Sin atributo'}
+                                    </Typography>
+                                  </Box>
+                                  <Chip label={getZoneLabel(inferDeckZone(card))} size="small" variant="outlined" />
+                                  <Button
+                                    size="small"
+                                    startIcon={<AddRoundedIcon />}
+                                    onClick={() => addCardToDraft(card)}
+                                  >
+                                    Agregar
+                                  </Button>
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+                  </Stack>
+
+                  <Box
+                    sx={{
+                      minHeight: { xs: 220, lg: 320 },
+                      alignSelf: { xs: 'stretch', lg: 'center' },
+                      mt: { xs: 0, lg: 3 },
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      overflow: 'hidden',
+                      backgroundColor: 'rgba(255,255,255,0.03)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {previewCard?.card_images?.[0]?.image_url ? (
+                      <Box
+                        component="img"
+                        src={previewCard.card_images[0].image_url}
+                        alt={previewCard.name}
+                        sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                    ) : (
+                      <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, textAlign: 'center' }}>
+                        Selecciona una carta para ver la imagen.
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '1fr 1fr 1fr 160px' } }}>
                 <TextField label="Nombre del deck" value={deckName} onChange={(event) => setDeckName(event.target.value)} />
                 <TextField label="Descripción" value={deckDescription} onChange={(event) => setDeckDescription(event.target.value)} />
+                <TextField label="Versión inicial" value={initialVersionName} onChange={(event) => setInitialVersionName(event.target.value)} />
                 <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={() => void handleCreateDeck()} disabled={isSaving}>
                   Guardar deck
                 </Button>
               </Box>
 
-              <Box sx={{ display: 'grid', gap: 1.2, mt: 1.5, gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0,1fr))' } }}>
+              <Box sx={{ display: 'grid', gap: 1.2, mt: 1.5, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0,1fr))', lg: 'repeat(3, minmax(0,1fr))' } }}>
                 {(['main', 'extra', 'side'] as DeckZone[]).map((zone) => {
                   const zoneCards = draftCards.filter((entry) => entry.zone === zone)
                   return (
@@ -546,7 +626,7 @@ function DeckBuilderPage() {
                       ))}
                     </Box>
 
-                    <Box sx={{ display: 'grid', gap: 1, mt: 1.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 120px' } }}>
+                    <Box sx={{ display: 'grid', gap: 1, mt: 1.5, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '1fr 1fr 140px' } }}>
                       <TextField label="Copiar desde versión" value={copyFromVersionId} onChange={(event) => setCopyFromVersionId(event.target.value)} placeholder="Opcional" />
                       <Button variant="contained" onClick={() => void handleCreateVersion()} disabled={isSaving}>
                         Crear versión
@@ -569,7 +649,7 @@ function DeckBuilderPage() {
                 Sección central con Main / Extra / Side, drag & drop nativo y resumen del mazo.
               </Typography>
 
-              <Alert severity="info">Zona activa actual: {getZoneLabel(selectedZone)}</Alert>
+              <Alert severity="info">Main y Extra se sugieren por tipo. Side queda disponible para ajustes manuales.</Alert>
 
               <Typography variant="body2">
                 Main: {mainCount}
