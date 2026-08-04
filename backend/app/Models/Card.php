@@ -12,6 +12,7 @@ class Card extends Model
 
     protected $fillable = [
         'name',
+        'external_id',
         'type',
         'frame_type',
         'description',

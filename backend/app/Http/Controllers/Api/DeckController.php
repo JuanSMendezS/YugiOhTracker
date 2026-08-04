@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Card;
 use App\Models\CardPrint;
 use App\Models\Deck;
 use App\Models\DeckVersion;
+use App\Models\Set;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class DeckController extends Controller
 {
@@ -30,12 +34,20 @@ class DeckController extends Controller
             'description' => ['nullable', 'string'],
             'initial_version_name' => ['nullable', 'string', 'max:255'],
             'cards' => ['nullable', 'array'],
-            'cards.*.card_id' => ['required_with:cards', 'uuid', 'exists:cards,id'],
+            'cards.*.card_id' => ['required_with:cards', 'string', 'max:64'],
             'cards.*.quantity' => ['required_with:cards', 'integer', 'min:1'],
             'cards.*.section' => ['required_with:cards', 'string', 'in:main,extra,side'],
         ]);
 
-        $deck = DB::transaction(function () use ($request, $validated): Deck {
+        $mappedCards = collect($validated['cards'] ?? [])->map(function (array $card): array {
+            return [
+                'card_id' => $this->resolveLocalCardId($card['card_id']),
+                'quantity' => $card['quantity'],
+                'section' => $card['section'],
+            ];
+        })->all();
+
+        $deck = DB::transaction(function () use ($request, $validated, $mappedCards): Deck {
             $deck = Deck::create([
                 'user_id' => $request->user()->id,
                 'name' => $validated['name'],
@@ -46,8 +58,8 @@ class DeckController extends Controller
                 'version_name' => $validated['initial_version_name'] ?? 'V1',
             ]);
 
-            if (! empty($validated['cards'])) {
-                $version->cards()->createMany($validated['cards']);
+            if (! empty($mappedCards)) {
+                $version->cards()->createMany($mappedCards);
             }
 
             return $deck;
@@ -91,19 +103,27 @@ class DeckController extends Controller
         $validated = $request->validate([
             'version_name' => ['required', 'string', 'max:255'],
             'cards' => ['nullable', 'array'],
-            'cards.*.card_id' => ['required_with:cards', 'uuid', 'exists:cards,id'],
+            'cards.*.card_id' => ['required_with:cards', 'string', 'max:64'],
             'cards.*.quantity' => ['required_with:cards', 'integer', 'min:1'],
             'cards.*.section' => ['required_with:cards', 'string', 'in:main,extra,side'],
             'copy_from_version_id' => ['nullable', 'uuid'],
         ]);
 
-        $version = DB::transaction(function () use ($deck, $validated): DeckVersion {
+        $mappedCards = collect($validated['cards'] ?? [])->map(function (array $card): array {
+            return [
+                'card_id' => $this->resolveLocalCardId($card['card_id']),
+                'quantity' => $card['quantity'],
+                'section' => $card['section'],
+            ];
+        })->all();
+
+        $version = DB::transaction(function () use ($deck, $validated, $mappedCards): DeckVersion {
             $version = $deck->versions()->create([
                 'version_name' => $validated['version_name'],
             ]);
 
-            if (! empty($validated['cards'])) {
-                $version->cards()->createMany($validated['cards']);
+            if (! empty($mappedCards)) {
+                $version->cards()->createMany($mappedCards);
                 return $version;
             }
 
@@ -134,6 +154,87 @@ class DeckController extends Controller
         abort_if($version->deck_id !== $deck->id, 404, 'Version no encontrada para este deck.');
 
         return response()->json($this->formatVersion($version));
+    }
+
+    private function resolveLocalCardId(string $incomingCardId): string
+    {
+        $normalized = trim($incomingCardId);
+        if ($normalized === '') {
+            abort(422, 'card_id invalido');
+        }
+
+        if (Str::isUuid($normalized)) {
+            $card = Card::query()->find($normalized);
+            if (! $card) {
+                abort(422, "La carta {$normalized} no existe en el catalogo local.");
+            }
+
+            return $card->id;
+        }
+
+        $existing = Card::query()->where('external_id', $normalized)->first();
+        if ($existing) {
+            return $existing->id;
+        }
+
+        $response = Http::timeout(15)->get('https://db.ygoprodeck.com/api/v7/cardinfo.php', [
+            'id' => $normalized,
+        ]);
+
+        if ($response->failed()) {
+            abort(422, "No se pudo resolver la carta externa {$normalized}.");
+        }
+
+        $payload = $response->json();
+        $cardData = $payload['data'][0] ?? null;
+        if (! is_array($cardData) || empty($cardData['name'])) {
+            abort(422, "La carta externa {$normalized} no fue encontrada.");
+        }
+
+        return DB::transaction(function () use ($normalized, $cardData): string {
+            $already = Card::query()->where('external_id', $normalized)->first();
+            if ($already) {
+                return $already->id;
+            }
+
+            $card = Card::create([
+                'name' => $cardData['name'],
+                'external_id' => $normalized,
+                'type' => $cardData['type'] ?? null,
+                'frame_type' => $cardData['frameType'] ?? null,
+                'description' => $cardData['desc'] ?? null,
+                'atk' => isset($cardData['atk']) ? (int) $cardData['atk'] : null,
+                'def' => isset($cardData['def']) ? (int) $cardData['def'] : null,
+                'level' => isset($cardData['level']) ? (int) $cardData['level'] : null,
+                'race' => $cardData['race'] ?? null,
+                'attribute' => $cardData['attribute'] ?? null,
+                'archetype' => $cardData['archetype'] ?? null,
+            ]);
+
+            $imageUrl = $cardData['card_images'][0]['image_url'] ?? null;
+            $marketPrice = $cardData['card_prices'][0]['cardmarket_price'] ?? null;
+
+            if (! empty($cardData['card_sets'][0]['set_code'])) {
+                $setCodeFull = $cardData['card_sets'][0]['set_code'];
+                $setCode = explode('-', $setCodeFull)[0] ?? $setCodeFull;
+
+                $set = Set::query()->firstOrCreate(
+                    ['code' => $setCode],
+                    ['name' => $cardData['card_sets'][0]['set_name'] ?? $setCode],
+                );
+
+                CardPrint::query()->firstOrCreate(
+                    ['card_id' => $card->id, 'set_id' => $set->id, 'print_code' => $setCodeFull],
+                    [
+                        'rarity' => $cardData['card_sets'][0]['set_rarity'] ?? 'Common',
+                        'price_cardmarket' => is_numeric($marketPrice) ? (float) $marketPrice : null,
+                        'image_url' => $imageUrl,
+                    ],
+                );
+            }
+
+            return $card->id;
+        });
     }
 
     private function ensureOwner(Deck $deck, string $userId): void

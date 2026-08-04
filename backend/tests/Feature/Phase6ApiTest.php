@@ -9,6 +9,7 @@ use App\Models\Profile;
 use App\Models\Set;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -137,6 +138,56 @@ class Phase6ApiTest extends TestCase
             'version_name' => 'V2',
             'copy_from_version_id' => $versionId,
         ])->assertCreated()->assertJsonPath('summary.total_cards', 3);
+    }
+
+    public function test_deck_creation_accepts_external_non_uuid_card_ids(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        Http::fake([
+            'https://db.ygoprodeck.com/api/v7/cardinfo.php*' => Http::response([
+                'data' => [[
+                    'id' => 89631139,
+                    'name' => 'Blue-Eyes White Dragon',
+                    'type' => 'Normal Monster',
+                    'frameType' => 'normal',
+                    'desc' => 'A legendary dragon.',
+                    'atk' => 3000,
+                    'def' => 2500,
+                    'level' => 8,
+                    'race' => 'Dragon',
+                    'attribute' => 'LIGHT',
+                    'archetype' => 'Blue-Eyes',
+                    'card_sets' => [[
+                        'set_name' => 'Legend of Blue Eyes White Dragon',
+                        'set_code' => 'LOB-001',
+                        'set_rarity' => 'Ultra Rare',
+                    ]],
+                    'card_images' => [[
+                        'image_url' => 'https://images.ygoprodeck.com/images/cards/89631139.jpg',
+                    ]],
+                    'card_prices' => [[
+                        'cardmarket_price' => '5.50',
+                    ]],
+                ]],
+            ], 200),
+        ]);
+
+        $response = $this->postJson('/api/decks', [
+            'name' => 'External ID Deck',
+            'initial_version_name' => 'V1',
+            'cards' => [
+                ['card_id' => '89631139', 'quantity' => 2, 'section' => 'main'],
+            ],
+        ])->assertCreated();
+
+        $this->assertSame('External ID Deck', $response->json('name'));
+        $this->assertSame(2, $response->json('versions.0.summary.total_cards'));
+        $this->assertDatabaseHas('cards', [
+            'external_id' => '89631139',
+            'name' => 'Blue-Eyes White Dragon',
+        ]);
     }
 
     public function test_checkout_reserves_listings_and_creates_history(): void
